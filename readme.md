@@ -52,3 +52,19 @@ commandList:
 > encounteredAnError: 遇到错误是否继续执行，false不继续直接退出。
 >
 > uploadFile: 上传文件到执行命令的主机，可选从网络(fromNetwork)或者从安装主机(fileSystem)
+
+
+# backend
+
+## interface
+
+```
+/status/task_number :在运行中的任务数量 {"task number": 10}
+/status/hosts :所有主机信息 {"hosts": ["hostname": "node1","ip":"10.0.0.10","cpu":10,"memory": 24,"disk":100]}
+/status/information :mncet的状态信息
+/status/{number}/status :对应序号任务的执行状态 {"task":[{"name":"init","status":"successed"},{"name":"install nginx","status":"running"}]}
+```
+
+
+
+
