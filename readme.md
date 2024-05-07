@@ -9,6 +9,7 @@ mncet(Multi node command execution tool :多节点命令执行工具)
 ### demo
 
 ```yaml
+taskName: "install service"
 recordLog:
   file: /var/log/mncet
 commandList:
@@ -63,6 +64,7 @@ commandList:
 /status/hosts :所有主机信息 {"hosts": ["hostname": "node1","ip":"10.0.0.10","cpu":10,"memory": 24,"disk":100]}
 /status/information :mncet的状态信息
 /status/{number}/status :对应序号任务的执行状态 {"task":[{"name":"init","status":"successed"},{"name":"install nginx","status":"running"}]}
+/submit/task :提交任务 yaml or json 返回 {"status":"successed","number": 2,"log":""}
 ```
 
 
