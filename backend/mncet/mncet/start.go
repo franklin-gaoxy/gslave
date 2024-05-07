@@ -6,7 +6,7 @@ import (
 	"log"
 	"mncet/mncet/tools"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 /*
@@ -29,7 +29,6 @@ func NewStart(configFilePath string) {
 	}
 
 	fmt.Println(config)
-
 }
 
 // init 命令执行
