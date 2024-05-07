@@ -67,6 +67,19 @@ commandList:
 /submit/task :提交任务 yaml or json 返回 {"status":"successed","number": 2,"log":""}
 ```
 
+启动配置
+```yaml
+port: 81
+database:
+  path: 10.0.0.10
+  port: 3306
+  username: root
+  password: 1qaz@WSX
+  basename: mncet
+login:
+  username: frnak
+  password: 1qaz@WSX
+```
 
 
 
