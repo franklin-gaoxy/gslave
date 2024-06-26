@@ -3,5 +3,8 @@ package main
 import "mncet/mncet/mncet"
 
 func main() {
-	mncet.Start()
+	if mncet.InitStart() {
+		mncet.Start()
+	}
+
 }

@@ -1,10 +1,8 @@
 package mncet
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 )
 
 /*
@@ -32,7 +30,8 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "print version.",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("v1.0")
+		// fmt.Println("v1.0")
+		klog.Infoln("v0.0")
 	},
 }
 
@@ -58,17 +57,20 @@ func init() {
 
 func checkConfigFile(configFilePath string) bool {
 	if configFilePath == "" {
-		fmt.Println("please input --config!")
+		// fmt.Println("please input --config!")
+		klog.Fatalln("please input --config!")
 		return false
 	}
-	fmt.Println("start!Use config file is :", configFilePath)
+	// fmt.Println("start!Use config file is :", configFilePath)
+	klog.V(2).Info("start!Use config file is :", configFilePath)
 	return true
 }
 
 // cobra的启动函数
 func Start() {
+
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalln("start error! please check database config!")
+		klog.Fatalln("start error! please check database config!")
 	}
 }
 

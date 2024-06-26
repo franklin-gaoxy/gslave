@@ -1,0 +1,32 @@
+env:
+  hostList:
+    - &host1 "test.node1.com" # 不使用别名
+    - &host2 "test.node2.com"
+    - &host3 "alias:test.node3.com" # 使用别名
+  download_url: "http://10.0.0.10:80/" # 全局下载地址
+
+taskName: "install service"
+recordLog:
+  file: /var/log/mncet
+commandList:
+  - stage:
+    name: init
+    hosts: [*host1,*host2,*host3] # or "all"
+    command: "curl 10.0.0.1/init.sh|bash"
+    concurrentMode: concurrent // 执行模式
+    encounteredAnError: true
+  - stage:
+    name: installer nginx
+    hosts: [*host1]
+    command: "apt-get install nginx -y"
+    concurrentMode: concurrent
+    encounteredAnError: false
+  - stage:
+    name: start service
+    hosts: [*host2,*host3]
+    command: "java -jar app.jar"
+    concurrentMode: concurrent
+    encounteredAnError: true
+    uploadFile: 
+      fromNetwork: "https://10.0.0.1/app.jar" # 从url下载
+      fileSystem: /data/installer_package/app.jar # 从指定路径复制

@@ -3,10 +3,11 @@ package mncet
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"mncet/mncet/tools"
 
-	"gopkg.in/yaml.v2"
+	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
+	"k8s.io/klog"
 )
 
 /*
@@ -14,25 +15,42 @@ import (
 这里通过前面的--config参数获取了一个配置文件的路径 并且传递给了启动函数
 */
 
+// init 命令执行
+func initEnvironment(configFilePath string) {
+	fmt.Println(configFilePath)
+}
+
 // 默认命令执行
 func NewStart(configFilePath string) {
 	var config tools.Config
 	yamlFile, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		log.Fatalf("Error reading YAML file: %s\n", err)
+		klog.Fatalf("Error reading YAML file: %s\n", err)
 	}
 
 	// 解析YAML文件内容到结构体
 	err = yaml.Unmarshal(yamlFile, &config)
 	if err != nil {
-		log.Fatalf("Error parsing YAML file: %s\n", err)
+		klog.Fatalf("Error parsing YAML file: %s\n", err)
 	}
 
-	fmt.Println(config)
-
+	// fmt.Println(config)
+	klog.V(3).Infof("config: %+v\n", config)
+	// start gin server
+	startGinServer(config.Port)
 }
 
-// init 命令执行
-func initEnvironment(configFilePath string) {
-	fmt.Println(configFilePath)
+func startGinServer(port int) {
+	var route *gin.Engine
+	route = gin.Default()
+
+	// binding interface
+	route.GET("/status/information", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "normal",
+		})
+	})
+
+	klog.V(1).Infof("start gin server on port %d", port)
+	route.Run(fmt.Sprintf(":%d", port))
 }
