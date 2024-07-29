@@ -65,7 +65,7 @@ commandList:
 /status/task :在运行中的任务数量和信息 {"task number": 1,[{"id":112,"taskName":"install task","status":"success","runTime":"xxxx"}]}
 /status/hosts :所有主机信息 {"hosts": ["hostname": "node1","ip":"10.0.0.10","cpu":10,"memory": 24,"disk":100]}
 /status/information :mncet的状态信息 {"status":"normal"}
-/status/{number}/status :对应序号任务的执行状态 {"task":[{"name":"init","status":"successed","log":"xxx"},{"name":"install nginx","status":"running","log":"xxx"}]}
+/status/{number}/status :对应序号任务的执行状态 {"task":[{"id":1,"name":"init","status":"successed","log":"xxx"},{"id":2,"name":"install nginx","status":"running","log":"xxx"}]}
 /add/task :提交任务 yaml or json 返回 {"status":"successed","number": 2,"log":""}
 /add/host :添加主机 {"hostname": "node1","ip":"10.0.0.10", "username":"root","password":"","sshkey":""}
 /add/restart/{number}/{number} :重新从某个任务的阶段开始向下
