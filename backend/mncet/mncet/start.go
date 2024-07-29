@@ -37,7 +37,8 @@ func NewStart(configFilePath string) {
 	// fmt.Println(config)
 	klog.V(3).Infof("config: %+v\n", config)
 	// start gin server
-	startGinServer(config.Port)
+	startGinServer(int(config.Port))
+
 }
 
 func startGinServer(port int) {

@@ -1,6 +1,8 @@
 
 # database
 
+## mysql
+
 #### hosts
 
 > 记录所有的主机
@@ -24,6 +26,27 @@ key 秘钥
 id 可重复
 alias_name 别名
 ```
+
+#### task
+
+> 记录所有的历史记录和运行任务信息
+
+```
+id: task id,每个完整的任务(一个yaml)生成一个单独的ID 一对多关系
+name: task名称
+status: 运行状态
+time: 最后一次的运行时间
+hosts: 运行在那些主机上
+group: 运行在那些主机组
+```
+
+
+
+
+
+
+
+---
 
 #### running_task
 
@@ -77,3 +100,14 @@ user(username password token)
 ```
 task(id)
 ```
+
+## MongoDB!
+
+或许MongoDB更适合这个场景.
+
+这样yaml就无需转换为二维表格,直接存储在MongoDB就可以了.
+
+否则需要记录上传的yaml信息
+
+1. 保存到主机,每次获取都查询解析一遍yaml
+2. 创建一个宽表,记录任务的每个字段信息,创建一个task的元数据表,记录元数据信息.

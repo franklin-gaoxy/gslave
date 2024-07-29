@@ -16,20 +16,25 @@ commandList:
   - stage:
     name: init
     hosts: ["node1","node2","node3"] # or "all"
+    group: ["allnode"]
     command: "curl 10.0.0.1/init.sh|bash"
-    concurrentMode: concurrent
+    hostconcurrentMode: concurrent
+    stepMode: "serial|background"
     encounteredAnError: true
   - stage:
     name: installer nginx
     hosts: ["node1"] # or "all"
+    group: ["allnode"]
     command: "apt-get install nginx -y"
-    concurrentMode: concurrent
+    hostconcurrentMode: concurrent
+    stepMode: "serial|background"
     encounteredAnError: false
   - stage:
     name: start service
     hosts: ["node2","node3"] # or "all"
     command: "java -jar app.jar"
-    concurrentMode: concurrent
+    hostconcurrentMode: concurrent
+    stepMode: "serial|background"
     encounteredAnError: true
     uploadFile: 
       fromNetwork: "https://10.0.0.1/app.jar"
@@ -48,9 +53,13 @@ commandList:
 >
 > hosts: 要在那些主机上执行
 >
+> group: 要在那些主机组上执行,和主机可以同时存在
+>
 > command: 要执行的命令
 >
-> concurrentMode: 执行模式，concurrent为并行，所有主机同时开始，serial(串行)一个一个执行，batch(批次)每次执行几个机器
+> hostconcurrentMode: 当前步骤在主机的执行模式，concurrent为并行，所有主机同时开始，serial(串行)一个一个执行，batch(批次)每次执行几个机器
+>
+> stepMode: 当前阶段的运行模式 serial当前阶段执行完成执行下一个 background无需等待执行完成即可执行下一个
 >
 > encounteredAnError: 遇到错误是否继续执行，false不继续直接退出。
 >
@@ -67,7 +76,9 @@ commandList:
 /status/information :mncet的状态信息 {"status":"normal"}
 /status/{number}/status :对应序号任务的执行状态 {"task":[{"id":1,"name":"init","status":"successed","log":"xxx"},{"id":2,"name":"install nginx","status":"running","log":"xxx"}]}
 /add/task :提交任务 yaml or json 返回 {"status":"successed","number": 2,"log":""}
-/add/host :添加主机 {"hostname": "node1","ip":"10.0.0.10", "username":"root","password":"","sshkey":""}
+/add/host :添加主机 {"hostname": "node1","ip":"10.0.0.10","username":"root","password":"","sshkey":""}
+/add/alias :添加别名
+/add/group : 添加组
 /add/restart/{number}/{number} :重新从某个任务的阶段开始向下
 /add/rerun/{number}/{number} :重新运行某个任务失败的阶段
 ```
