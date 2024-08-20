@@ -80,7 +80,7 @@ commandList:
 /add/alias :添加别名
 /add/group : 添加组
 /add/restart/{number}/{number} :重新从某个任务的阶段开始向下
-/add/rerun/{number}/{number} :重新运行某个任务失败的阶段
+/add/rerun/{number}/{number} :重新单独运行某个任务失败的阶段
 ```
 
 启动配置
@@ -99,3 +99,18 @@ login:
 
 
 
+---
+
+# 问题
+
+issues
+
+用户首先添加机器,接下来连接测试确认无误记录到数据库,添加成功.
+
+接下来用户上传installers yaml,首先检查yaml格式,然后记录yaml,同时格式化里面的主机
+
+> 问题: 如何格式化主机?使用变量方式?使用标签方式?
+
+用户开始执行任务,生成一个ID,返回给用户,接下来根据这个ID记录所有的执行步骤,包含状态和执行结果.
+
+执行完成后更新对应ID的任务状态.
