@@ -114,3 +114,65 @@ issues
 用户开始执行任务,生成一个ID,返回给用户,接下来根据这个ID记录所有的执行步骤,包含状态和执行结果.
 
 执行完成后更新对应ID的任务状态.
+
+host info
+
+```
+{
+	"hostname": "xxx",
+	"address": ["xxx", "xxx"],
+	"group": ["xxx", "xxx"],
+	"login": {
+		"username": "xx",
+		"password": "xxx",
+		"port": "xxx",
+		"sshkey": "xxx"
+	},
+	"hostinfo": {
+		"cpu": 10,
+		"memory": 100,
+		"disk": [{
+			"mountpoint": "size",
+			"mountpoint": "size"
+		}]
+	}
+	"status": "active",
+}
+```
+
+task info
+
+```
+{
+	"taskname": "xxx",
+	"taskid": "xxx",
+	"stage": [{
+		"stagename": "xx",
+		"stageresult": "xxxx",
+		"stagestatus": "xxx"
+	}, {
+		"stagename": "xx",
+		"stageresult": "xxxx",
+		"stagestatus": "xxx"
+	}, {
+		"stagename": "xx",
+		"stageresult": "xxxx",
+		"stagestatus": "xxx"
+	}]
+}
+```
+
+system info
+
+```
+{
+	"system status": "running",
+	"task": {
+		"all task": "xx",
+		"running task": "xxx",
+		"failed task": "xxx"
+	},
+	"version": "1.0.0"
+}
+```
+
