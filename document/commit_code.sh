@@ -4,4 +4,9 @@ git add .
 hn=`hostname`
 us=`whoami`
 git commit -m "[${hn}:${us}]:Auto submit"
-git push me master
+if [ "$us" -eq "wb.gaoxiuyang01" ];then
+    git push
+else 
+    git push me master
+fi
+
