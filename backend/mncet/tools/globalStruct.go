@@ -8,19 +8,20 @@ var Version string = "1.0.0"
 type Config struct {
 	Port     int8 `yaml:"port"`
 	Database struct {
-		Path     string
-		Port     int8
-		User     UserConfig
-		Basename string
+		Type     string     `yaml:"type"`
+		Path     string     `yaml:"path"`
+		Port     int8       `yaml:"port"`
+		User     UserConfig `yaml:"user"`
+		Basename string     `yaml:"basename"`
 	}
-	login struct {
+	Login struct {
 		User UserConfig
-	}
+	} `yaml:"login"`
 }
 
 type UserConfig struct {
-	Username string
-	Password string
+	Username string `yaml:"username"`
+	Password string `yaml:"password""`
 }
 
 /*

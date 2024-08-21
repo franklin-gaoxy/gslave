@@ -3,6 +3,7 @@ package mncet
 import (
 	"fmt"
 	"io/ioutil"
+	"mncet/mncet/databases"
 	"mncet/mncet/tools"
 
 	"github.com/gin-gonic/gin"
@@ -27,9 +28,11 @@ func NewStart(configFilePath string) {
 	// fmt.Println(config)
 	klog.V(3).Infof("config: %+v\n", config)
 	// init database
+	// 获取数据库连接
+	database := NewDatabase(tools.Config.Database.Type)
 
 	// start gin server
-	startGinServer(int(config.Port))
+	startGinServer(int(config.Port), database)
 
 }
 
@@ -50,8 +53,11 @@ func readConfig(configFilePath string) tools.Config {
 }
 
 // return database interface
+func NewDatabase(databaseType string) databases.Databases {
+	return databases.NewDatabases(databaseType)
+}
 
-func startGinServer(port int) {
+func startGinServer(port int, database databases.Databases) {
 	var route *gin.Engine
 	route = gin.Default()
 
@@ -60,6 +66,11 @@ func startGinServer(port int) {
 		c.JSON(200, gin.H{
 			"status": "normal",
 		})
+	})
+
+	// add host
+	route.POST("/host/add", func(c *gin.Context) {
+		AddHost(c, database)
 	})
 
 	klog.V(1).Infof("start gin server on port %d", port)
