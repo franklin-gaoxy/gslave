@@ -1,6 +1,8 @@
 package mncet
 
 import (
+	"mncet/mncet/tools"
+
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 )
@@ -31,7 +33,7 @@ var versionCmd = &cobra.Command{
 	Short: "print version.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// fmt.Println("v1.0")
-		klog.Infoln("v0.0")
+		klog.Infoln(tools.Version)
 	},
 }
 

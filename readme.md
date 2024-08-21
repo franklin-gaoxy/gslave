@@ -97,6 +97,24 @@ login:
   password: 1qaz@WSX
 ```
 
+### 启动配置
+
+```yaml
+port: 8000
+database:
+  connPath: 
+  port:
+  user:
+  basename: mncet
+login:
+  username:
+  password:
+```
+
+
+
+
+
 
 
 ---
@@ -132,11 +150,13 @@ host info
 		"cpu": 10,
 		"memory": 100,
 		"disk": [{
-			"mountpoint": "size",
+			"mountpoint": "size"
+
+		}, {
 			"mountpoint": "size"
 		}]
 	}
-	"status": "active",
+	"status": "active"
 }
 ```
 

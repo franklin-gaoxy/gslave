@@ -22,6 +22,18 @@ func initEnvironment(configFilePath string) {
 
 // 默认命令执行
 func NewStart(configFilePath string) {
+	config := readConfig(configFilePath)
+
+	// fmt.Println(config)
+	klog.V(3).Infof("config: %+v\n", config)
+	// init database
+
+	// start gin server
+	startGinServer(int(config.Port))
+
+}
+
+func readConfig(configFilePath string) tools.Config {
 	var config tools.Config
 	yamlFile, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
@@ -34,12 +46,10 @@ func NewStart(configFilePath string) {
 		klog.Fatalf("Error parsing YAML file: %s\n", err)
 	}
 
-	// fmt.Println(config)
-	klog.V(3).Infof("config: %+v\n", config)
-	// start gin server
-	startGinServer(int(config.Port))
-
+	return config
 }
+
+// return database interface
 
 func startGinServer(port int) {
 	var route *gin.Engine
