@@ -6,6 +6,43 @@ mncet(Multi node command execution tool :多节点命令执行工具)
 
 ## use
 
+### 锚点
+
+```yaml
+hosts:
+  - &host1 node1
+  - &host2 node2
+  - &host3 node3
+
+taskName: "install service"
+recordLog:
+  file: /var/log/mncet
+commandList:
+  - stage:
+      name: init
+      hosts: [*host1, *host2, *host3]
+      command: "curl 10.0.0.1/init.sh | bash"
+      concurrentMode: concurrent
+      encounteredAnError: true
+  - stage:
+      name: install nginx
+      hosts: [*host1]
+      command: "apt-get install nginx -y"
+      concurrentMode: concurrent
+      encounteredAnError: false
+  - stage:
+      name: start service
+      hosts: [*host2, *host3]
+      command: "java -jar app.jar"
+      concurrentMode: concurrent
+      encounteredAnError: true
+      uploadFile:
+        fromNetwork: "https://10.0.0.1/app.jar"
+        fileSystem: /data/installer_package/app.jar
+```
+
+
+
 ### demo
 
 ```yaml
