@@ -1,12 +1,14 @@
 package databases
 
+import "mncet/mncet/tools"
+
 type Databases interface {
 	/*
 		databases interface
 	*/
 
 	// init func conn database return conn,err
-	init()
+	Init(config tools.ServerConfig)
 }
 
 func NewDatabases(databaseType string) Databases {

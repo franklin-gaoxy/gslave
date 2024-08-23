@@ -16,8 +16,9 @@ type Mongodb struct {
 func NewMongodb() *Mongodb {
 	return &Mongodb{}
 }
-func (m *Mongodb) init() {
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+func (m *Mongodb) Init(config tools.ServerConfig) {
+	klog.Info(config)
+	clientOptions := options.Client().ApplyURI(config.Database.Path)
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		klog.Fatal(err)

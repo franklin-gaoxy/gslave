@@ -5,9 +5,10 @@ package tools
 */
 var Version string = "1.0.0"
 
-type Config struct {
-	Port     int8 `yaml:"port"`
+type ServerConfig struct {
+	Port     int16 `yaml:"port"`
 	Database struct {
+		ConnPath string     `yaml:"connPath"`
 		Type     string     `yaml:"type"`
 		Path     string     `yaml:"path"`
 		Port     int8       `yaml:"port"`
@@ -21,7 +22,7 @@ type Config struct {
 
 type UserConfig struct {
 	Username string `yaml:"username"`
-	Password string `yaml:"password""`
+	Password string `yaml:"password"`
 }
 
 /*
@@ -56,7 +57,7 @@ type TaskInfo struct {
 	TaskId   string `yaml:"taskId" bson:"taskId"`
 	Stage    []struct {
 		StageName   string `yaml:"stageName" bson:"stageName"`
-		StageResult string `yaml:"stageResult" 	bson:"stageResult"`
+		StageResult string `yaml:"stageResult" bson:"stageResult"`
 		StageStatus string `yaml:"stageStatus" bson:"stageStatus"`
 	} `yaml:"stage" bson:"stage"`
 }

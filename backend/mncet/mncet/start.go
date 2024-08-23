@@ -29,15 +29,16 @@ func NewStart(configFilePath string) {
 	klog.V(3).Infof("config: %+v\n", config)
 	// init database
 	// 获取数据库连接
-	database := NewDatabase(tools.Config.Database.Type)
+	database := NewDatabase(config.Database.Type)
+	database.Init(config)
 
 	// start gin server
 	startGinServer(int(config.Port), database)
 
 }
 
-func readConfig(configFilePath string) tools.Config {
-	var config tools.Config
+func readConfig(configFilePath string) tools.ServerConfig {
+	var config tools.ServerConfig
 	yamlFile, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		klog.Fatalf("Error reading YAML file: %s\n", err)

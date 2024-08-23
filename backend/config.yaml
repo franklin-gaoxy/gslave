@@ -1,0 +1,9 @@
+port: 8000
+database:
+  connPath: mongodb://localhost:27017 
+  port: 
+  user: 
+  basename: mncet
+login:
+  username: admin
+  password: admin

@@ -1,11 +1,13 @@
 package mncet
 
 import (
+	"fmt"
 	"mncet/mncet/databases"
 	"mncet/mncet/tools"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"k8s.io/klog"
 )
 
 func AddHost(c *gin.Context, database databases.Databases) {
@@ -16,6 +18,7 @@ func AddHost(c *gin.Context, database databases.Databases) {
 		})
 		return
 	}
+	klog.V(1).Info(fmt.Sprintf("AddHost: %v", HostInfo))
 	// database.AddHosts([]tools.Hosts{HostInfo})
 
 	c.JSON(http.StatusOK, gin.H{"status": 200})
