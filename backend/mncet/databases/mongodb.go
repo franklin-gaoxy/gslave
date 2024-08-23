@@ -17,6 +17,7 @@ func NewMongodb() *Mongodb {
 	return &Mongodb{}
 }
 func (m *Mongodb) Init(config tools.ServerConfig) {
+	klog.V(5).Info("begin exec MongoDB init")
 	klog.Info(config)
 	clientOptions := options.Client().ApplyURI(config.Database.Path)
 	client, err := mongo.Connect(context.TODO(), clientOptions)
