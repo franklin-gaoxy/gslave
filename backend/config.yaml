@@ -1,8 +1,16 @@
 port: 8000
 database:
-  connPath: mongodb://localhost:27017 
-  port: 
-  user: 
+  databaseType: mongodb
+  # connpath和host等二选一
+  connPath: mongodb://192.168.0.12:27017
+  host: 192.168.0.12
+  port: 27017
+  # 其他参数 authSource 在那个库创建的
+  authSource: admin
+  authType: username
+  description:
+    username: myUserAdmin
+    password: new_password
   basename: mncet
 login:
   username: admin

@@ -8,12 +8,16 @@ var Version string = "1.0.0"
 type ServerConfig struct {
 	Port     int16 `yaml:"port"`
 	Database struct {
-		ConnPath string     `yaml:"connPath"`
-		Type     string     `yaml:"type"`
-		Path     string     `yaml:"path"`
-		Port     int8       `yaml:"port"`
-		User     UserConfig `yaml:"user"`
-		Basename string     `yaml:"basename"`
+		DataBaseType string `yaml:"databaseType"`
+		ConnPath     string `yaml:"connPath"`
+		//Type         string     `yaml:"type"`
+		Path        string     `yaml:"path"`
+		Host        string     `yaml:"host"`
+		Port        int16      `yaml:"port"`
+		AuthSource  string     `yaml:"authSource"`
+		AuthType    string     `yaml:"authType"`
+		Description UserConfig `yaml:"description"`
+		BaseName    string     `yaml:"basename"`
 	}
 	Login struct {
 		User UserConfig
@@ -37,16 +41,18 @@ type Tasks struct {
 		Stages []Stage
 	} `yaml:"commandList" bson:"commandList"`
 }
+
+// 定义了接口来匹配不同模式下的describe的内容
+type Desctibe interface{}
+
 type Stage struct {
-	Name               string   `yaml:"name" bson:"name"`
-	Hosts              []string `yaml:"hosts" bson:"hosts"`
-	Command            string   `yaml:"command" bson:"command"`
-	ConcurrentMode     string   `yaml:"concurrentMode" bson:"concurrentMode"`
-	EncounteredAnError bool     `yaml:"encounteredAnError" bson:"encounteredAnError"`
-	UploadFile         struct {
-		FromNetwork string `yaml:"fromNetwork" bson:"fromNetwork"`
-		FileSystem  string `yaml:"fileSystem" bson:"fileSystem"`
-	} `yaml:"uploadFile" bson:"uploadFile"`
+	Name  string   `yaml:"name" bson:"name"`
+	Hosts []string `yaml:"hosts" bson:"hosts"`
+	Group string   `yaml:"group" bson:"group"`
+	Mode  string   `yaml:"mode" bson:"mode"`
+	Type  string   `yaml:"type" bson:"type"`
+	// 该字段根据不同的mode和type来匹配不同的值
+	Describe Desctibe `yaml:"describe" bson:"describe"`
 }
 
 /*
@@ -72,19 +78,23 @@ type Hosts struct {
 	Login    struct {
 		Username string `yaml:"username" bson:"username"`
 		Password string `yaml:"password" bson:"password"`
-		Port     int8   `yaml:"port" bson:"port"`
+		Port     int16  `yaml:"port" bson:"port"`
 		SSHKey   string `yaml:"sshKey" bson:"sshKey"`
 	} `yaml:"login" bson:"login"`
 	HostInfo struct {
-		CPU    string `yaml:"cpu" bson:"cpu"`
-		Memory string `yaml:"memory" bson:"memory"`
-		Disk   []MountDisk
+		CPU       string `yaml:"cpu" bson:"cpu"`
+		Memory    string `yaml:"memory" bson:"memory"`
+		Disk      []MountDisk
+		TotalSize float64 `yaml:"totalSize" bson:"totalSize"`
 	} `yaml:"hostInfo" bson:"hostInfo"`
-	Status string `yaml:"status" bson:"status"`
+	Status   string `yaml:"status" bson:"status"`
+	Describe string `yaml:"describe" bson:"describe"`
 }
 type MountDisk struct {
-	MountPoint string `yaml:"mountpoint" bson:"mountpoint"`
-	Size       string `yaml:"size" bson:"size"`
+	Device     string   `yaml:"device" bson:"device"`
+	Name       string   `yaml:"name" bson:"name"`
+	MountPoint []string `yaml:"mountpoints" bson:"mountpoints"`
+	Size       int      `yaml:"size" bson:"size"`
 }
 
 /*

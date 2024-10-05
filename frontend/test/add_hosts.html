@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Host Form</title>
+    <style>
+        /* 样式代码 */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .form-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message {
+            margin-top: 15px;
+            text-align: center;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+<div class="form-container">
+    <h2>Add Host</h2>
+    <form id="hostForm">
+        <div class="form-group">
+            <label for="hostname">Hostname</label>
+            <input type="text" id="hostname" name="hostname" required>
+        </div>
+        <div class="form-group">
+            <label for="address">Address</label>
+            <input type="text" id="address" name="address" required>
+        </div>
+        <div class="form-group">
+            <label for="group">Group</label>
+            <input type="text" id="group" name="group" required>
+        </div>
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+            <label for="port">Port</label>
+            <input type="number" id="port" name="port" required>
+        </div>
+        <!-- 可选字段 -->
+        <div class="form-group">
+            <label for="sshKey">SSH Key (Optional)</label>
+            <input type="text" id="sshKey" name="sshKey">
+        </div>
+        <div class="form-group">
+            <label for="cpu">CPU (Optional)</label>
+            <input type="text" id="cpu" name="cpu">
+        </div>
+        <div class="form-group">
+            <label for="memory">Memory (Optional)</label>
+            <input type="text" id="memory" name="memory">
+        </div>
+        <div id="disk-container">
+            <div class="form-group">
+                <label for="disk1-mountpoint">Disk 1 Mountpoint (Optional)</label>
+                <input type="text" id="disk1-mountpoint" name="disk1-mountpoint">
+                <label for="disk1-size">Disk 1 Size (Optional)</label>
+                <input type="text" id="disk1-size" name="disk1-size">
+            </div>
+        </div>
+        <button type="button" id="addDiskButton">Add Another Disk</button>
+        <button type="submit">Submit</button>
+        <div id="message" class="message"></div>
+    </form>
+</div>
+
+<script>
+    let diskCount = 1;
+
+    // 动态添加更多的 Disk 输入字段
+    document.getElementById('addDiskButton').addEventListener('click', function() {
+        diskCount++;
+        const diskContainer = document.getElementById('disk-container');
+        const newDisk = document.createElement('div');
+        newDisk.classList.add('form-group');
+        newDisk.innerHTML = `
+                <label for="disk${diskCount}-mountpoint">Disk ${diskCount} Mountpoint (Optional)</label>
+                <input type="text" id="disk${diskCount}-mountpoint" name="disk${diskCount}-mountpoint">
+                <label for="disk${diskCount}-size">Disk ${diskCount} Size (Optional)</label>
+                <input type="text" id="disk${diskCount}-size" name="disk${diskCount}-size">
+            `;
+        diskContainer.appendChild(newDisk);
+    });
+
+    document.getElementById('hostForm').addEventListener('submit', function(event) {
+        event.preventDefault();  // 阻止表单的默认提交行为
+
+        // 收集表单数据
+        const formData = {
+            hostname: document.getElementById('hostname').value,
+            address: document.getElementById('address').value,
+            group: document.getElementById('group').value,
+            login: {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                port: parseInt(document.getElementById('port').value),
+                sshKey: document.getElementById('sshKey').value || null // 可选字段
+            },
+            hostInfo: {
+                cpu: document.getElementById('cpu').value || null, // 可选字段
+                memory: document.getElementById('memory').value || null, // 可选字段
+                disk: []
+            },
+            status: "active"  // 假设这里状态默认为 active
+        };
+
+        // 收集所有的 Disk 数据
+        for (let i = 1; i <= diskCount; i++) {
+            const mountpoint = document.getElementById(`disk${i}-mountpoint`).value;
+            const size = document.getElementById(`disk${i}-size`).value;
+            if (mountpoint && size) {
+                formData.hostInfo.disk.push({
+                    mountPoint: mountpoint,
+                    size: size
+                });
+            }
+        }
+
+        // 发起POST请求，发送JSON格式的数据
+        fetch('http://localhost:8000/host/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)  // 将表单数据转换为JSON格式
+        })
+            .then(response => response.json())
+            .then(data => {
+                const messageDiv = document.getElementById('message');
+                if (data.success) {
+                    messageDiv.textContent = 'Host added successfully!';
+                    messageDiv.className = 'message success';
+                } else {
+                    messageDiv.textContent = 'Error: ' + (data.message || 'Failed to add host.');
+                    messageDiv.className = 'message error';
+                }
+            })
+            .catch(error => {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = 'Network Error: ' + error.message;
+                messageDiv.className = 'message error';
+            });
+    });
+</script>
+</body>
+</html>

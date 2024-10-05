@@ -29,7 +29,10 @@ func NewStart(configFilePath string) {
 	klog.V(3).Infof("config: %+v\n", config)
 	// init database
 	// 获取数据库连接
-	database := NewDatabase(config.Database.Type)
+	database := NewDatabase(config.Database.DataBaseType)
+	if database == nil {
+		klog.Fatal("database Not initialized correctly, is nil!")
+	}
 	database.Init(config)
 
 	// start gin server
@@ -73,7 +76,11 @@ func startGinServer(port int, database databases.Databases) {
 	route.POST("/host/add", func(c *gin.Context) {
 		AddHost(c, database)
 	})
+	// update host infor
+	route.POST("/host/update", func(c *gin.Context) {
+		UpdateHost(c, database)
+	})
 
 	klog.V(1).Infof("start gin server on port %d", port)
-	route.Run(fmt.Sprintf(":%d", port))
+	_ = route.Run(fmt.Sprintf(":%d", port))
 }

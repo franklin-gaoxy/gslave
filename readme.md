@@ -102,6 +102,60 @@ commandList:
 >
 > uploadFile: 上传文件到执行命令的主机，可选从网络(fromNetwork)或者从安装主机(fileSystem)
 
+### demo2
+
+```yaml
+taskName: "install service"
+recordLog:
+  file: /var/log/mncet
+list:
+  - stage:
+    name: init
+    hosts: ["node1","node2","node3"] # or "all"
+    group: ["allnode"]
+    mode: command
+    type: command
+    describe:
+      command: "curl 10.0.0.1/init.sh|bash"
+      hostconcurrentMode: concurrent
+      stepMode: "serial|background"
+      encounteredAnError: true
+  - stage:
+    name: installer nginx
+    hosts: ["node1"] # or "all"
+    group: ["allnode"]
+    mode: command
+    type: command
+    describe:
+      command: "apt-get install nginx -y"
+      hostconcurrentMode: concurrent
+      stepMode: "serial|background"
+      encounteredAnError: false
+  - stage:
+    name: start service
+    hosts: ["node2","node3"] # or "all"
+    mode: command
+    type: command
+    describe:
+      command: "java -jar app.jar"
+      hostconcurrentMode: concurrent
+      stepMode: "serial|background"
+      encounteredAnError: true
+      uploadFile: 
+        fromNetwork: "https://10.0.0.1/app.jar"
+        fileSystem: /data/installer_package/app.jar
+  - stage:
+    name: put file
+    hosts: ["node2","node3"] # or "all"
+    mode: file
+    type: local/file
+    describe:
+      uploadFile: 
+        fromNetwork: "https://10.0.0.1/app.jar"
+        fileSystem: /data/installer_package/app.jar
+```
+
+
 
 # backend
 
@@ -120,7 +174,112 @@ commandList:
 /add/rerun/{number}/{number} :重新单独运行某个任务失败的阶段
 ```
 
+已经实现：
+
+### `/status/information`
+
+> 用于检查服务运行是否正常，无需传参，返回json
+
+```
+传参：
+	无需传参
+返回
+	{"status": "normal"}
+```
+
+### `/host/add`
+
+> 添加主机，传递一个数组，自动循环添加
+>
+> hostname 和address两个有一个为必须参数 login.username login.password和login.sshKey 两个有一个为必须参数
+
+#### 可接受的所有参数
+
+```golang
+type Hosts struct {
+	Hostname string `yaml:"hostname" bson:"hostname"`
+	Address  string `yaml:"address" bson:"address"`
+	Group    string `yaml:"group" bson:"group"`
+	Login    struct {
+		Username string `yaml:"username" bson:"username"`
+		Password string `yaml:"password" bson:"password"`
+		Port     int16  `yaml:"port" bson:"port"`
+		SSHKey   string `yaml:"sshKey" bson:"sshKey"`
+	} `yaml:"login" bson:"login"`
+	HostInfo struct {
+		CPU       string `yaml:"cpu" bson:"cpu"`
+		Memory    string `yaml:"memory" bson:"memory"`
+		Disk      []MountDisk
+		TotalSize float64 `yaml:"totalSize" bson:"totalSize"`
+	} `yaml:"hostInfo" bson:"hostInfo"`
+	Status   string `yaml:"status" bson:"status"`
+	Describe string `yaml:"describe" bson:"describe"`
+}
+type MountDisk struct {
+	Device     string   `yaml:"device" bson:"device"`
+	Name       string   `yaml:"name" bson:"name"`
+	MountPoint []string `yaml:"mountpoints" bson:"mountpoints"`
+	Size       int      `yaml:"size" bson:"size"`
+}
+```
+
+#### demo
+
+```
+传参：
+[{
+    "hostname": "develop",
+    "address": "192.168.0.12",
+    "group": "host1",
+    "login": {"username":"root","password":"1qaz@WSX","port":22}
+}]
+返回：
+{
+    "status": 200
+}
+```
+
+### `/host/update`
+
+> 更新主机CPU 内存信息,可选传参，不传参则更新所有
+
+#### 可接受的所有参数
+
+```golang
+	type kv struct {
+		key   string
+		value string
+	}
+```
+
+
+
+#### demo
+
+```
+传参：
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 启动配置
+
 ```yaml
 port: 81
 database:
@@ -139,13 +298,21 @@ login:
 ```yaml
 port: 8000
 database:
-  connPath: 
-  port:
-  user:
+  databaseType: mongodb
+  # connpath和host等二选一
+  connPath: mongodb://192.168.0.12:27017
+  host: 192.168.0.12
+  port: 27017
+  # 其他参数
+  authSource: 
+  authType: username
+  description:
+    username: myUserAdmin
+    password: 1qaz@WSX
   basename: mncet
 login:
-  username:
-  password:
+  username: admin
+  password: admin
 ```
 
 
@@ -231,5 +398,94 @@ system info
 	},
 	"version": "1.0.0"
 }
+```
+
+
+
+# 可能用到
+
+策略模式简化代码避免大量的判断
+
+```go
+type Handler interface {
+	Execute()
+}
+
+type CommandHandler struct {
+	CommandDescribe CommandDescribe
+}
+
+func (h *CommandHandler) Execute() {
+	// 执行命令逻辑
+}
+
+type URLHandler struct {
+	URLDescribe URLDescribe
+}
+
+func (h *URLHandler) Execute() {
+	// 执行 URL 逻辑
+}
+
+type LocalHandler struct {
+	URLDescribe URLDescribe
+}
+
+func (h *LocalHandler) Execute() {
+	// 执行 Local 逻辑
+}
+
+func main() {
+	var config Config
+
+	// 假设已解析 YAML 到 config
+
+	handlerMap := map[string]map[string]Handler{
+		"command": {
+			"command": &CommandHandler{CommandDescribe: config.Describe.(CommandDescribe)},
+		},
+		"file": {
+			"file":   &URLHandler{URLDescribe: config.Describe.(URLDescribe)},
+			"local": &LocalHandler{URLDescribe: config.Describe.(URLDescribe)},
+		},
+	}
+
+	// 获取处理器并执行
+	if handler, ok := handlerMap[config.Mode][config.Type]; ok {
+		handler.Execute()
+	}
+}
+
+```
+
+kubernetes使用的策略模式
+
+```go
+type Plugin interface {
+    Filter(node *Node, pod *Pod) bool
+    Score(node *Node, pod *Pod) int
+}
+
+type Scheduler struct {
+    plugins map[string]Plugin
+}
+
+func (s *Scheduler) Schedule(pod *Pod) {
+    // 过滤阶段
+    for _, node := range nodes {
+        for _, plugin := range s.plugins {
+            if !plugin.Filter(node, pod) {
+                continue // 不满足条件，跳过
+            }
+        }
+        // 打分阶段
+        score := 0
+        for _, plugin := range s.plugins {
+            score += plugin.Score(node, pod)
+        }
+        // 记录得分
+    }
+}
+
 ```
 

@@ -1,119 +1,84 @@
 package main
 
-// func Loginit() {
-// 	// 设置日志格式为文本格式
-// 	log.SetFormatter(&log.TextFormatter{
-// 		// 是否显示完整时间戳
-// 		FullTimestamp: true,
-// 		// 时间戳格式
-// 		TimestampFormat: "2006-01-02 15:04:05",
-// 		// 是否显示日志级别
-// 		DisableLevelTruncation: true,
-// 	})
-
-// 	// 设置日志级别为Debug
-// 	log.SetLevel(log.DebugLevel)
-
-// 	// 将日志输出到标准输出
-// 	log.SetOutput(os.Stdout)
-// }
-
-// func main() {
-// 	Loginit()
-// 	log.WithFields(log.Fields{
-// 		"animal": "walrus",
-// 		"size":   10,
-// 	}).Info("A group of walrus emerges from the ocean")
-
-// 	log.Info("this is a info log!")
-// 	log.Warning("this is a warning!")
-// 	log.Error("this is a error!")
-
-// 	fmt.Println("end.")
-// }
-
 import (
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
-	"os"
-
-	"golang.org/x/crypto/ssh"
+	"time"
 )
 
-// 主机信息
-type host struct {
-	hostname string
-	username string
-	password string
-	port     int
-	key      string
-	keyfile  string
-	ip       string
+type Hosts struct {
+	Hostname string `yaml:"hostname" bson:"hostname"`
+	Address  string `yaml:"address" bson:"address"`
+	Group    string `yaml:"group" bson:"group"`
+	Login    struct {
+		Username string `yaml:"username" bson:"username"`
+		Password string `yaml:"password" bson:"password"`
+		Port     int16  `yaml:"port" bson:"port"`
+		SSHKey   string `yaml:"sshKey" bson:"sshKey"`
+	} `yaml:"login" bson:"login"`
+	HostInfo struct {
+		CPU    string `yaml:"cpu" bson:"cpu"`
+		Memory string `yaml:"memory" bson:"memory"`
+		Disk   []MountDisk
+	} `yaml:"hostInfo" bson:"hostInfo"`
+	Status string `yaml:"status" bson:"status"`
 }
-
-// 会话信息
-type session struct {
-	session  *ssh.Session
-	hostname string
-	ip       string
-}
-
-func createSession(hostSlice []host) []session {
-	var sessionSlice []session
-	for _, h := range hostSlice {
-		config := &ssh.ClientConfig{
-			User: h.username,
-			Auth: []ssh.AuthMethod{
-				ssh.Password(h.password),
-			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		}
-		client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", h.ip, h.port), config)
-		if err != nil {
-			log.Println("Failed to dial: ", err)
-			continue
-		}
-		client_session, err := client.NewSession()
-		if err != nil {
-			log.Println("Failed to create session: ", err)
-			continue
-		}
-		tmpSessionSlice := session{
-			session:  client_session,
-			hostname: h.hostname,
-			ip:       h.ip,
-		}
-		sessionSlice = append(sessionSlice, tmpSessionSlice)
-
-	}
-	return sessionSlice
+type MountDisk struct {
+	MountPoint string `yaml:"mountpoint" bson:"mountpoint"`
+	Size       string `yaml:"size" bson:"size"`
 }
 
 func main() {
-	var hostSlice []host = []host{
-		{
-			ip:       "192.168.137.100",
-			username: "root",
-			password: "1qaz@WSX",
-			port:     22,
-			hostname: "debian",
-		},
-		{
-			ip:       "192.168.137.200",
-			username: "root",
-			password: "1qaz@WSX",
-			port:     22,
-			hostname: "centos",
-		},
+	var hosts Hosts
+	hosts.Hostname = "example-host"
+	hosts.Address = "192.168.1.1"
+	hosts.Group = "example-group"
+	hosts.Login.Username = "example-username"
+	hosts.Login.Password = "example-password"
+	hosts.Login.Port = 22
+	// 设置 MongoDB 客户端连接选项
+	clientOptions := options.Client().ApplyURI("mongodb://myUserAdmin:new_password@192.168.0.12:27017/mncet?authSource=admin")
+
+	// 连接到 MongoDB
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if err != nil {
+		log.Fatal(err)
 	}
-	for _, s := range createSession(hostSlice) {
-		output, err := s.session.CombinedOutput("ls -l /root/")
-		if err != nil {
-			log.Fatal("Failed to run: ", err)
-		}
-		fmt.Printf("================= %v =================\n", s.hostname)
-		os.Stdout.Write(output)
-		fmt.Printf("======================================\n")
+
+	// 检查连接
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		log.Fatal(err)
 	}
-	fmt.Print("end.")
+
+	fmt.Println("Connected to MongoDB!")
+
+	// 选择数据库和集合
+	collection := client.Database("mncet").Collection("testcollection")
+
+	// 准备要插入的数据
+	document := bson.D{
+		{Key: "name", Value: "John Doe"},
+		{Key: "age", Value: 30},
+		{Key: "created_at", Value: time.Now()},
+	}
+
+	// 插入数据
+	insertResult, err := collection.InsertOne(context.TODO(), document)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Inserted document with ID: %v\n", insertResult.InsertedID)
+
+	// 关闭连接
+	err = client.Disconnect(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connection to MongoDB closed.")
 }
