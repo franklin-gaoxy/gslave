@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog"
+	"mncet/mncet/databases"
+	"mncet/mncet/mncet/plugins"
+	"mncet/mncet/mncet/servertools"
 	"mncet/mncet/tools"
 	"strconv"
 	"strings"
@@ -12,7 +15,7 @@ import (
 	"time"
 )
 
-func GetHostMeta(hosts *[]tools.Hosts) {
+func GetHostMeta(hosts *[]tools.HostInfo) {
 	var wg sync.WaitGroup
 	var pool chan struct{} = make(chan struct{}, 10)
 
@@ -28,7 +31,7 @@ func GetHostMeta(hosts *[]tools.Hosts) {
 	klog.V(8).Infoln("get host meta successfully.")
 }
 
-func GetHostMetaWorker(host *tools.Hosts, wg *sync.WaitGroup, pool chan struct{}) {
+func GetHostMetaWorker(host *tools.HostInfo, wg *sync.WaitGroup, pool chan struct{}) {
 	defer func() {
 		wg.Done()
 		pool <- struct{}{}
@@ -39,6 +42,8 @@ func GetHostMetaWorker(host *tools.Hosts, wg *sync.WaitGroup, pool chan struct{}
 	client, status := sshRemoteHost(host)
 	if !status {
 		klog.Infof("connect to host fail: %s", host.Address)
+		host.Status = "failed"
+		host.Describe = "failed!SSH connection to remote host failed."
 		return
 	}
 
@@ -122,7 +127,7 @@ func runCommand(client *ssh.Client, command string) (string, error) {
 	return string(output), nil
 }
 
-func sshRemoteHost(host *tools.Hosts) (*ssh.Client, bool) {
+func sshRemoteHost(host *tools.HostInfo) (*ssh.Client, bool) {
 	//connect to host
 	var authMethod ssh.AuthMethod
 	if host.Login.Username != "" && host.Login.Password != "" {
@@ -155,4 +160,79 @@ func sshRemoteHost(host *tools.Hosts) (*ssh.Client, bool) {
 		return nil, false
 	}
 	return client, true
+}
+
+func ExecuteTasks(ID *int, RunTaskArgs *tools.RunTask, data *tools.TemplateAndValues, dbs databases.Databases) bool {
+	klog.V(6).Infof("[operation_host.go:ExecuteTasks]: ExecuteTasks start execute!")
+	klog.V(8).Infof("[operation_host.go:ExecuteTasks]: All parameters passed in: {{ RunTaskArgs }}:>>%s<<\n{{ data }}:>>%s<<\n", RunTaskArgs, data)
+
+	// 格式化yaml中的变量
+	var ser tools.StageExecutionRecord // 用来记录执行过程中的信息
+	ser.TaskID = *ID
+	status, descriptionfile, err := servertools.FormatYamlContent([]byte(data.TemplateData), []byte(data.ValuesData))
+	if status == false {
+		klog.V(8).Infof("[operation_host.go:ExecuteTasks]: Format template content error:%v", err)
+		return false
+	}
+
+	// 更新到数据库 对应ID任务标记为执行状态
+	ser.Status = "running"
+	ser.StageInfos = make(map[string]tools.StageInfo)
+	klog.V(6).Infof("[operation_host.go:ExecuteTasks]: YAML formatting completed, starting loop stage.")
+	klog.V(8).Infof("[operation_host.go:ExecuteTasks]: {{ descriptionfile }}:>>%s<<", descriptionfile)
+
+	for i, v := range descriptionfile.ExecutionList {
+		// 需要检查RunTaskArgs 从那个位置开始启动
+		klog.V(8).Infof("[operation_host.go:ExecuteTasks]: Start checking the start and stop positions.")
+		if RunTaskArgs.StartPosition != "" {
+			if v.Stages.Name != RunTaskArgs.StartPosition {
+				// 如果当前阶段的Stage Name 和传入的StartPosition 不同 那么直接循环下一个
+				// 如果是 则开始执行
+				klog.V(6).Infof("[operation_host.go:ExecuteTasks]: The starting position has been specified, but it has not yet arrived. loop again.")
+				continue
+			}
+
+			// 如果StartPosition 不为空 那么则检查StopPosition
+			if RunTaskArgs.StopPosition != "" && v.Stages.Name == RunTaskArgs.StopPosition {
+				// 如果当前阶段的Name和StopPosition相同 那么则退出不再继续执行
+				klog.V(8).Infof("[operation_host.go:ExecuteTasks]: Designated end position, arrived, exit")
+				break
+			}
+		}
+		klog.V(6).Infof("[operation_host.go:ExecuteTasks]: Task running parameters (start position and stop position) check completed.")
+
+		// 提取此阶段需要的主机信息 格式化到v.HostInfo
+		//v.HostsConn = make(map[string]tools.HostInfo)
+		hosts, err := servertools.CheckHostExist(&v.Stages, dbs)
+		if err != nil {
+			klog.V(8).Infof("[operation_host.go:ExecuteTasks]: CheckHostExist error! error is %v", err)
+		}
+		v.Stages.HostsConn = *hosts
+
+		// 创建stage 更新到数据库 某个stage开始执行 v.Name
+		ser.StageInfos[v.Stages.Name] = tools.StageInfo{Status: "running"}
+		// 同步数据库
+		dbs.SaveTaskResult(&ser)
+		klog.Infof("[operation_host.go:ExecuteTasks]: executed {{ i }}:<<%d>>, {{ v.Name }}:<<%s>>, {{ v.Mode }}:<<%s>>, {{ v.Type }}:<<%s>>", i, v.Stages.Name, v.Stages.Mode, v.Stages.Type)
+
+		// 调用方法
+		stage := plugins.CreatePlugin()[v.Stages.Mode]
+		err = stage.CallMethodByType(&ser, v.Stages.Type, &v.Stages)
+
+		// 每执行完成一个stage 就保存一次执行信息
+		dbs.SaveTaskResult(&ser)
+
+		if err != nil {
+			klog.Errorf("[operation_host.go:ExecuteTasks]: execute stage:%s, mode:%s, type:%s, error:%v", v.Stages.Name, v.Stages.Mode, v.Stages.Type, err)
+			// 遇到错误判断是否可以继续往下执行
+			if !v.Stages.EncounteredAnError {
+				klog.Infof("[operation_host.go:ExecuteTasks]: Task ID %d:Step %s is incorrect, this stage has failed and cannot continue", *ID, v.Stages.Name)
+				return false
+			}
+		}
+		klog.V(8).Infof("[operation_host.go:ExecuteTasks]: {{ ser }}:<<%s>>", ser)
+	}
+	ser.Status = "succeed"
+	dbs.SaveTaskResult(&ser)
+	return true
 }

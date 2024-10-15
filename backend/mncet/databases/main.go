@@ -13,10 +13,22 @@ type Databases interface {
 	// init func conn database return conn,err
 	Init(config tools.ServerConfig)
 
-	// Add Hosts
-	AddHosts(*[]tools.Hosts) bool
+	// Add HostInfo
+	AddHosts(*[]tools.HostInfo) bool
 	// query all hosts
-	QueryHosts(key string, value string) *[]tools.Hosts
+	QueryHosts(key string, value string) *[]tools.HostInfo
+	// delete host
+	DeleteHost(key string, value string) bool
+	// save submit task content
+	SaveTasksTemplate(*tools.TemplateAndValues) bool
+	// query task
+	QueryTasks(TaskName string) *tools.TemplateAndValues
+	// save task execute result
+	SaveTaskResult(StageExecutionRecord *tools.StageExecutionRecord) bool
+	// generate task number
+	GenerateID() (int, error)
+	// by id query task describe
+	QueryTaskResult(ID *int) *tools.StageExecutionRecord
 }
 
 func NewDatabases(databaseType string) Databases {

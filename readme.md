@@ -6,158 +6,98 @@ mncet(Multi node command execution tool :多节点命令执行工具)
 
 ## use
 
-### 锚点
+需要两个文件 template 和values。
 
 ```yaml
-hosts:
-  - &host1 node1
-  - &host2 node2
-  - &host3 node3
-
-taskName: "install service"
+taskName: "install service3"
 recordLog:
   file: /var/log/mncet
-commandList:
+executionList:
   - stage:
       name: init
-      hosts: [*host1, *host2, *host3]
-      command: "curl 10.0.0.1/init.sh | bash"
-      concurrentMode: concurrent
-      encounteredAnError: true
-  - stage:
-      name: install nginx
-      hosts: [*host1]
-      command: "apt-get install nginx -y"
-      concurrentMode: concurrent
+      hosts: ["develop"]
+      group: ["allnode"]
+      mode: Command
+      type: ExecuteCommand
       encounteredAnError: false
+      describe:
+        command: "curl 10.0.0.1/init.sh|bash"
+        hostConcurrentMode: concurrent
+        stepMode: "serial"
+  - stage:
+      name: installer nginx
+      hosts: ["develop"]
+      group: ["allnode"]
+      mode: Command
+      type: ExecuteCommand
+      encounteredAnError: false
+      describe:
+        command: "apt-get install nginx -y"
+        hostConcurrentMode: concurrent
+        stepMode: "serial"
   - stage:
       name: start service
-      hosts: [*host2, *host3]
-      command: "java -jar app.jar"
-      concurrentMode: concurrent
+      hosts: ["develop"]
+      mode: Command
+      type: ExecuteCommand
       encounteredAnError: true
-      uploadFile:
-        fromNetwork: "https://10.0.0.1/app.jar"
-        fileSystem: /data/installer_package/app.jar
-```
-
-
-
-### demo
-
-```yaml
-taskName: "install service"
-recordLog:
-  file: /var/log/mncet
-commandList:
+      describe:
+        command: "java -jar app.jar"
+        hostConcurrentMode: concurrent
+        stepMode: "serial|background"
   - stage:
-    name: init
-    hosts: ["node1","node2","node3"] # or "all"
-    group: ["allnode"]
-    command: "curl 10.0.0.1/init.sh|bash"
-    hostconcurrentMode: concurrent
-    stepMode: "serial|background"
-    encounteredAnError: true
-  - stage:
-    name: installer nginx
-    hosts: ["node1"] # or "all"
-    group: ["allnode"]
-    command: "apt-get install nginx -y"
-    hostconcurrentMode: concurrent
-    stepMode: "serial|background"
-    encounteredAnError: false
-  - stage:
-    name: start service
-    hosts: ["node2","node3"] # or "all"
-    command: "java -jar app.jar"
-    hostconcurrentMode: concurrent
-    stepMode: "serial|background"
-    encounteredAnError: true
-    uploadFile: 
-      fromNetwork: "https://10.0.0.1/app.jar"
-      fileSystem: /data/installer_package/app.jar
-```
-
-
-
-> recordLog: 是否记录日志
->
-> commandList: 命令列表
->
-> stage: 多个步骤
->
-> name: 步骤名称
->
-> hosts: 要在那些主机上执行
->
-> group: 要在那些主机组上执行,和主机可以同时存在
->
-> command: 要执行的命令
->
-> hostconcurrentMode: 当前步骤在主机的执行模式，concurrent为并行，所有主机同时开始，serial(串行)一个一个执行，batch(批次)每次执行几个机器
->
-> stepMode: 当前阶段的运行模式 serial当前阶段执行完成执行下一个 background无需等待执行完成即可执行下一个
->
-> encounteredAnError: 遇到错误是否继续执行，false不继续直接退出。
->
-> uploadFile: 上传文件到执行命令的主机，可选从网络(fromNetwork)或者从安装主机(fileSystem)
-
-### demo2
-
-```yaml
-taskName: "install service"
-recordLog:
-  file: /var/log/mncet
-list:
-  - stage:
-    name: init
-    hosts: ["node1","node2","node3"] # or "all"
-    group: ["allnode"]
-    mode: command
-    type: command
-    describe:
-      command: "curl 10.0.0.1/init.sh|bash"
-      hostconcurrentMode: concurrent
-      stepMode: "serial|background"
-      encounteredAnError: true
-  - stage:
-    name: installer nginx
-    hosts: ["node1"] # or "all"
-    group: ["allnode"]
-    mode: command
-    type: command
-    describe:
-      command: "apt-get install nginx -y"
-      hostconcurrentMode: concurrent
-      stepMode: "serial|background"
+      name: init
+      hosts: ["develop"]
+      group: ["allnode"]
+      mode: Command
+      type: ExecuteCommand
       encounteredAnError: false
+      describe:
+        command: "apt-get install apt-file -y"
+        hostConcurrentMode: concurrent
+        stepMode: "serial"
   - stage:
-    name: start service
-    hosts: ["node2","node3"] # or "all"
-    mode: command
-    type: command
-    describe:
-      command: "java -jar app.jar"
-      hostconcurrentMode: concurrent
-      stepMode: "serial|background"
+      name: put file
+      hosts: ["develop"]
+      mode: File
+      type: Local
       encounteredAnError: true
-      uploadFile: 
-        fromNetwork: "https://10.0.0.1/app.jar"
-        fileSystem: /data/installer_package/app.jar
-  - stage:
-    name: put file
-    hosts: ["node2","node3"] # or "all"
-    mode: file
-    type: local/file
-    describe:
-      uploadFile: 
-        fromNetwork: "https://10.0.0.1/app.jar"
-        fileSystem: /data/installer_package/app.jar
+      describe:
+        uploadFile: 
+          fromNetwork: {{ .network.filepath }}
+          fileSystem: {{ .file.system }}
 ```
 
+```yaml
+network:
+  filepath: "https://10.0.0.1/app.jar"
+file:
+  system: "/data/installer_package/app.jar"
+```
 
+> stage 定义不同的阶段，在这里面可以定义使用不同的模块
+>
+> name 此阶段的名称
+>
+> encounteredAnError 如果此阶段遇到错误 是否继续向下执行
+>
+> describe 此字段需要根据使用的模块来定义。不同模块对应的字段也不相同。
+>
+> mode 使用的模块名称，换算到代码，就是struct的名称
+>
+> type 使用的函数的名称，和mode结合使用，两个组合起来就是 寻找实现了tools.Desctibe interface{}的mode内容的struct的type内容的函数。
 
 # backend
+
+## mongodb
+
+### hosts
+
+保存主机相关，主机的连接方式，和状态等
+
+### tasks
+
+保存提交的任务相关。
 
 ## interface
 
@@ -181,10 +121,15 @@ list:
 > 用于检查服务运行是否正常，无需传参，返回json
 
 ```
-传参：
-	无需传参
-返回
-	{"status": "normal"}
+request url: 127.0.0.1:8000/status/information
+request type: get
+body type: nil
+Passing Parameters：
+	nil
+return:
+{
+    "status": 200
+}
 ```
 
 ### `/host/add`
@@ -192,6 +137,8 @@ list:
 > 添加主机，传递一个数组，自动循环添加
 >
 > hostname 和address两个有一个为必须参数 login.username login.password和login.sshKey 两个有一个为必须参数
+>
+> 如果提交信息有误（不包括主机名IP）可以重新提交
 
 #### 可接受的所有参数
 
@@ -225,15 +172,20 @@ type MountDisk struct {
 
 #### demo
 
+![image-20241005201103145](./picture/readme/image-20241005201103145.png)
+
 ```
-传参：
+request url: 127.0.0.1:8000/host/add
+request type: post
+body type: raw
+Passing Parameters：
 [{
     "hostname": "develop",
     "address": "192.168.0.12",
     "group": "host1",
     "login": {"username":"root","password":"1qaz@WSX","port":22}
 }]
-返回：
+return:
 {
     "status": 200
 }
@@ -241,15 +193,17 @@ type MountDisk struct {
 
 ### `/host/update`
 
-> 更新主机CPU 内存信息,可选传参，不传参则更新所有
+> POST raw
+>
+> 更新主机CPU 内存信息,可选传参，不传参则更新所有，传参需要传递根据什么来进行筛选 如 hostname字段为xxx 或者address字段为 xxx
 
 #### 可接受的所有参数
 
 ```golang
-	type kv struct {
-		key   string
-		value string
-	}
+type kv struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 ```
 
 
@@ -262,15 +216,119 @@ type MountDisk struct {
 
 
 
+### `/host/delete`
+
+> 删除主机 需要传递参数 hostname or address 
+
+#### 可接受的所有参数
+
+```golang
+type kv struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+```
 
 
 
+#### demo
+
+```
+request url: 127.0.0.1:8000/host/delete
+request type: post
+body type: raw
+Passing Parameters：
+{
+    "key":"hostname",
+    "value":"develop2"
+}
+return:
+{
+    "status": 200
+}
+```
+
+### `/task/add`
+
+> 添加任务。将提交的template.yaml和values.yaml保存到database中。
+>
+> 仅用于提交后保存任务 不执行
+
+#### 可接受的所有参数
+
+```golang
+type TemplateAndValues struct {
+	TaskName     string `json:"taskName" bson:"taskName"`
+	TemplateData []byte `json:"template" bson:"template"`
+	ValuesData   []byte `json:"values" bson:"values"`
+}
+```
 
 
 
+#### demo
+
+```
+request url: 127.0.0.1:8000/task/add
+request type: post
+body type: raw
+Passing Parameters：
+{
+    "taskName":"install nginx",
+    "template":"template...",
+    "values":"values..."
+}
+return:
+{
+    "status": 200
+}
+```
+
+### `/task/run`
+
+> 用于运行指定的任务
+
+#### 可接受的所有参数
+
+```golang
+type RunTask struct {
+	TaskName      string `json:"taskName" bson:"taskName"`
+	StartPosition string `json:"startPosition" bson:"startPosition"`
+	StopPosition  string `json:"stopPosition" bson:"stopPosition"`
+}
+```
 
 
 
+#### demo
+
+```
+request url: 127.0.0.1:8000/task/add
+request type: post
+body type: raw
+Passing Parameters：
+{
+    "taskName":"install nginx",
+    "template":"template...",
+    "values":"values..."
+}
+return:
+{
+    "status": 200
+}
+```
+
+### `/task/get`
+
+> 用于请求任务的详细信息
+
+#### 可接受的所有参数
+
+```
+?id=5
+```
+
+#### demo
 
 
 
@@ -314,6 +372,154 @@ login:
   username: admin
   password: admin
 ```
+
+
+
+## plugin详解
+
+必须实现接口 `tools.Desctibe`（位于tools.globalStruct.go）。
+
+```golang
+type Desctibe interface {
+	// output details
+	Details()
+	CallMethodByType(ser *StageExecutionRecord, typeName string, args *Stage) error
+}
+```
+
+### demo
+
+```golang
+type Command struct {}
+
+func (c *Command) Details() {
+	klog.Infof("model: command.")
+}
+
+func (c *Command) CallMethodByType(ser *tools.StageExecutionRecord, typeName string, arg *tools.Stage) error {
+	return servertools.CallMethodByName(c, ser, typeName, arg)
+}
+
+// 开始运行的函数名称 struct名称要和yaml的mode字段完全相同 函数名称要和type字段完全相同 必须接收ser 和 data
+func (c *Command) ExecuteCommand(ser *tools.StageExecutionRecord, data *tools.Stage) error {}
+```
+
+### 参数详情
+
+#### ser *tools.StageExecutionRecord
+
+> 用来记录每个阶段执行的状态 日志等信息
+
+```golang
+type StageExecutionRecord struct {
+	TaskID     int                  `json:"taskID" bson:"ID"` // 当前阶段的任务ID
+	StageInfos map[string]StageInfo `json:"stageInfo" bson:"stageInfo"` // 所有阶段的信息
+	Status     string               `json:"status" bson:"status"` // 总任务的运行状态 running failed ...
+}
+type StageInfo struct {
+	StageName         string                     `json:"name" bson:"name"` // 阶段名称
+	Status            string                     `json:"status" bson:"status"` // 阶段执行状态
+	HostExecuteResult map[string]StageHostStatus `json:"hostExecuteResult" bson:"hostExecuteResult"` // 此阶段所有主机的执行结果
+	StageRunStatus    string                     `json:"stageRunStatus" bson:"stageRunStatus"` // 阶段运行状态
+	Event             string                     `json:"event" bson:"event"` // 此阶段产生的事件
+	Time              time.Time                  `json:"time" bson:"time"` // 阶段开始的时间
+}
+type StageHostStatus struct {
+	//HostName string `json:"hostName" bson:"hostName"`
+	Result string `json:"status" bson:"status"` // 命令运行的结果
+	Error  string `json:"error" bson:"error"` // 产生的错误
+}
+```
+
+#### arg *tools.Stage
+
+> 用来传递用户提交的完整的yaml 包含了所有信息和完整的主机信息
+>
+> 此参数可以读取到非当前阶段的内容
+>
+> Describe中的参数为自定义参数 用来满足不同插件对于不同字段的需求
+
+```golang
+type Stage struct {
+	Name               string     `yaml:"name" bson:"name"` // 阶段名称
+	Hosts              []string   `yaml:"hosts" bson:"hosts"`
+	HostsConn          []HostInfo `yaml:"hostsConn" bson:"hostsConn"`
+	Group              []string   `yaml:"group" bson:"group"`
+	Mode               string     `yaml:"mode" bson:"mode"`
+	Type               string     `yaml:"type" bson:"type"`
+	EncounteredAnError bool       `yaml:"encounteredAnError" bson:"encounteredAnError"`
+	// 该字段根据不同的mode和type来匹配不同的值
+	Describe map[string]interface{} `yaml:"describe" bson:"describe"`
+}
+type HostInfo struct {
+	Hostname string `yaml:"hostname" bson:"hostname"`
+	Address  string `yaml:"address" bson:"address"`
+	Group    string `yaml:"group" bson:"group"`
+	Login    Login  `yaml:"login" bson:"login"`
+	HostInfo struct {
+		CPU       string `yaml:"cpu" bson:"cpu"`
+		Memory    string `yaml:"memory" bson:"memory"`
+		Disk      []MountDisk
+		TotalSize float64 `yaml:"totalSize" bson:"totalSize"`
+	} `yaml:"hostInfo" bson:"hostInfo"`
+	Status   string `yaml:"status" bson:"status"`
+	Describe string `yaml:"describe" bson:"describe"`
+}
+type MountDisk struct {
+	Device     string   `yaml:"device" bson:"device"`
+	Name       string   `yaml:"name" bson:"name"`
+	MountPoint []string `yaml:"mountpoints" bson:"mountpoints"`
+	Size       int      `yaml:"size" bson:"size"`
+}
+```
+
+##### Stage.Describe 字段参数绑定示例
+
+```golang
+// 声明相关的配置信息
+type config struct {
+	RemotePath         string
+	Command            string `json:"command" yaml:"command"`
+	HostConcurrentMode string `json:"hostConcurrentMode" yaml:"hostConcurrentMode"`
+	StepMode           string `json:"stepMode" yaml:"stepMode"`
+}
+type Command struct {
+	config    config
+	data      *tools.Stage
+	ser       *tools.StageExecutionRecord
+	stageinfo *tools.StageInfo
+}
+
+func (c *Command) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Stage) {
+    // 获取describe传入的所有字段
+	c.config = config{
+		Command:            data.Describe["command"].(string),
+		HostConcurrentMode: data.Describe["hostConcurrentMode"].(string),
+		StepMode:           data.Describe["stepMode"].(string),
+	}
+	c.data = data
+	c.ser = ser
+	c.stageinfo = &tools.StageInfo{HostExecuteResult: make(map[string]tools.StageHostStatus)}
+}
+```
+
+#### 注意事项：
+
+##### 1. 操作变量时不要覆盖
+
+```golang
+// 第一种 当使用此方式赋值时 会覆盖掉c.ser.StageInfos[c.data.Name]原有的所有变量！
+c.ser.StageInfos[c.data.Name] = tools.StageInfo{Status: "succeed"}
+
+// 第二种 此方式不会覆盖掉原有的变量 并且可以给字段赋值
+if stageInfo, exists := c.ser.StageInfos[c.data.Name]; exists {
+	// 只更新 Status 字段，保留其他字段
+	stageInfo.Status = "succeed"
+	c.ser.StageInfos[c.data.Name] = stageInfo
+}
+```
+
+
 
 
 
@@ -399,6 +605,16 @@ system info
 	"version": "1.0.0"
 }
 ```
+
+
+
+```golang
+type UpdateTaskStatus struct {
+    TaskID int
+}
+```
+
+
 
 
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"mncet/mncet/databases"
+	"mncet/mncet/mncet/servertools"
 	"mncet/mncet/tools"
 
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,8 @@ func NewStart(configFilePath string) {
 	}
 	database.Init(config)
 
+	// register plugin
+	servertools.RegisterPlugin()
 	// start gin server
 	startGinServer(int(config.Port), database)
 
@@ -79,6 +82,23 @@ func startGinServer(port int, database databases.Databases) {
 	// update host infor
 	route.POST("/host/update", func(c *gin.Context) {
 		UpdateHost(c, database)
+	})
+
+	route.POST("/host/delete", func(c *gin.Context) {
+		DeleteHost(c, database)
+	})
+
+	route.POST("/task/add", func(c *gin.Context) {
+		TaskAdd(c, database)
+	})
+
+	route.POST("/task/run", func(c *gin.Context) {
+		TaskRun(c, database)
+	})
+
+	// 根据ID查询任务运行的状态
+	route.GET("/task/get", func(c *gin.Context) {
+		TaskGet(c, database)
 	})
 
 	klog.V(1).Infof("start gin server on port %d", port)
