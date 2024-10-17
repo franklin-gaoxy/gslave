@@ -1,8 +1,8 @@
-# mncet
+# gslave
 
 ## brief introduction
 
-mncet(Multi node command execution tool :多节点命令执行工具)
+None
 
 ## use
 
@@ -89,30 +89,13 @@ file:
 
 # backend
 
-## mongodb
+## databases
 
-### hosts
-
-保存主机相关，主机的连接方式，和状态等
-
-### tasks
-
-保存提交的任务相关。
+用来定义不同的数据库
 
 ## interface
 
-```
-/status/task :在运行中的任务数量和信息 {"task number": 1,[{"id":112,"taskName":"install task","status":"success","runTime":"xxxx"}]}
-/status/hosts :所有主机信息 {"hosts": ["hostname": "node1","ip":"10.0.0.10","cpu":10,"memory": 24,"disk":100]}
-/status/information :mncet的状态信息 {"status":"normal"}
-/status/{number}/status :对应序号任务的执行状态 {"task":[{"id":1,"name":"init","status":"successed","log":"xxx"},{"id":2,"name":"install nginx","status":"running","log":"xxx"}]}
-/add/task :提交任务 yaml or json 返回 {"status":"successed","number": 2,"log":""}
-/add/host :添加主机 {"hostname": "node1","ip":"10.0.0.10","username":"root","password":"","sshkey":""}
-/add/alias :添加别名
-/add/group : 添加组
-/add/restart/{number}/{number} :重新从某个任务的阶段开始向下
-/add/rerun/{number}/{number} :重新单独运行某个任务失败的阶段
-```
+
 
 已经实现：
 
@@ -286,7 +269,7 @@ return:
 
 ### `/task/run`
 
-> 用于运行指定的任务
+> 用于运行指定名称的任务，会返回一个任务ID，根据任务ID可以查询任务的状态信息
 
 #### 可接受的所有参数
 
@@ -336,20 +319,7 @@ return:
 
 
 
-启动配置
-
-```yaml
-port: 81
-database:
-  path: 10.0.0.10
-  port: 3306
-  username: root
-  password: 1qaz@WSX
-  basename: mncet
-login:
-  username: frnak
-  password: 1qaz@WSX
-```
+## 启动配置
 
 ### 启动配置
 
@@ -375,7 +345,7 @@ login:
 
 
 
-## plugin详解
+## plugin内容
 
 必须实现接口 `tools.Desctibe`（位于tools.globalStruct.go）。
 
@@ -531,177 +501,11 @@ if stageInfo, exists := c.ser.StageInfos[c.data.Name]; exists {
 
 # 问题
 
-issues
-
-用户首先添加机器,接下来连接测试确认无误记录到数据库,添加成功.
-
-接下来用户上传installers yaml,首先检查yaml格式,然后记录yaml,同时格式化里面的主机
-
-> 问题: 如何格式化主机?使用变量方式?使用标签方式?
-
-用户开始执行任务,生成一个ID,返回给用户,接下来根据这个ID记录所有的执行步骤,包含状态和执行结果.
-
-执行完成后更新对应ID的任务状态.
-
-host info
-
-```
-{
-	"hostname": "xxx",
-	"address": ["xxx", "xxx"],
-	"group": ["xxx", "xxx"],
-	"login": {
-		"username": "xx",
-		"password": "xxx",
-		"port": "xxx",
-		"sshkey": "xxx"
-	},
-	"hostinfo": {
-		"cpu": 10,
-		"memory": 100,
-		"disk": [{
-			"mountpoint": "size"
-
-		}, {
-			"mountpoint": "size"
-		}]
-	}
-	"status": "active"
-}
-```
-
-task info
-
-```
-{
-	"taskname": "xxx",
-	"taskid": "xxx",
-	"stage": [{
-		"stagename": "xx",
-		"stageresult": "xxxx",
-		"stagestatus": "xxx"
-	}, {
-		"stagename": "xx",
-		"stageresult": "xxxx",
-		"stagestatus": "xxx"
-	}, {
-		"stagename": "xx",
-		"stageresult": "xxxx",
-		"stagestatus": "xxx"
-	}]
-}
-```
-
-system info
-
-```
-{
-	"system status": "running",
-	"task": {
-		"all task": "xx",
-		"running task": "xxx",
-		"failed task": "xxx"
-	},
-	"version": "1.0.0"
-}
-```
 
 
+# 剩余的内容
 
-```golang
-type UpdateTaskStatus struct {
-    TaskID int
-}
-```
+1. 实现file模块，用于从网络或者从当前主机获取文件传输到对端指定路径
 
-
-
-
-
-# 可能用到
-
-策略模式简化代码避免大量的判断
-
-```go
-type Handler interface {
-	Execute()
-}
-
-type CommandHandler struct {
-	CommandDescribe CommandDescribe
-}
-
-func (h *CommandHandler) Execute() {
-	// 执行命令逻辑
-}
-
-type URLHandler struct {
-	URLDescribe URLDescribe
-}
-
-func (h *URLHandler) Execute() {
-	// 执行 URL 逻辑
-}
-
-type LocalHandler struct {
-	URLDescribe URLDescribe
-}
-
-func (h *LocalHandler) Execute() {
-	// 执行 Local 逻辑
-}
-
-func main() {
-	var config Config
-
-	// 假设已解析 YAML 到 config
-
-	handlerMap := map[string]map[string]Handler{
-		"command": {
-			"command": &CommandHandler{CommandDescribe: config.Describe.(CommandDescribe)},
-		},
-		"file": {
-			"file":   &URLHandler{URLDescribe: config.Describe.(URLDescribe)},
-			"local": &LocalHandler{URLDescribe: config.Describe.(URLDescribe)},
-		},
-	}
-
-	// 获取处理器并执行
-	if handler, ok := handlerMap[config.Mode][config.Type]; ok {
-		handler.Execute()
-	}
-}
-
-```
-
-kubernetes使用的策略模式
-
-```go
-type Plugin interface {
-    Filter(node *Node, pod *Pod) bool
-    Score(node *Node, pod *Pod) int
-}
-
-type Scheduler struct {
-    plugins map[string]Plugin
-}
-
-func (s *Scheduler) Schedule(pod *Pod) {
-    // 过滤阶段
-    for _, node := range nodes {
-        for _, plugin := range s.plugins {
-            if !plugin.Filter(node, pod) {
-                continue // 不满足条件，跳过
-            }
-        }
-        // 打分阶段
-        score := 0
-        for _, plugin := range s.plugins {
-            score += plugin.Score(node, pod)
-        }
-        // 记录得分
-    }
-}
-
-```
+2. 实现 group 主机组的功能
 
