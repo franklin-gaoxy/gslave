@@ -63,9 +63,8 @@ executionList:
       type: Local
       encounteredAnError: true
       describe:
-        uploadFile: 
-          fromNetwork: {{ .network.filepath }}
-          fileSystem: {{ .file.system }}
+        from: /data/file
+        to: /data/
 ```
 
 ```yaml
@@ -359,6 +358,8 @@ type Desctibe interface {
 
 ### demo
 
+> 必须返回error
+
 ```golang
 type Command struct {}
 
@@ -443,7 +444,7 @@ type MountDisk struct {
 }
 ```
 
-##### Stage.Describe 字段参数绑定示例
+#### Stage.Describe 字段参数绑定示例
 
 ```golang
 // 声明相关的配置信息
@@ -489,9 +490,38 @@ if stageInfo, exists := c.ser.StageInfos[c.data.Name]; exists {
 }
 ```
 
+### Command
+
+#### Command.ExecuteCommand
+
+```yaml
+      describe:
+        command: "apt-get install apt-file -y"
+        hostConcurrentMode: concurrent
+        stepMode: "serial"
+```
+
+### File
+
+#### File.LocalFiles
+
+```yaml
+      describe:
+        hostConcurrentMode: concurrent
+        from: /data/file # from host path
+        to: /data/ # to remote host path
+```
 
 
 
+#### File.RemoteFile
+
+```yaml
+      describe:
+        hostConcurrentMode: concurrent
+        fromNetwork: "https://xxx.com/files/xxx" # from network
+        to: /data/
+```
 
 
 

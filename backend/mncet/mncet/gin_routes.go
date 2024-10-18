@@ -1,7 +1,6 @@
 package mncet
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"k8s.io/klog"
 	"mncet/mncet/databases"
@@ -28,7 +27,7 @@ func AddHost(c *gin.Context, database databases.Databases) {
 		})
 		return
 	}
-	klog.V(1).Info(fmt.Sprintf("AddHost: %v", HostInfo))
+	klog.V(1).Infof("AddHost: %v", HostInfo)
 	// check args
 	for _, host := range HostInfo {
 		if host.Address == "" || host.Hostname == "" {

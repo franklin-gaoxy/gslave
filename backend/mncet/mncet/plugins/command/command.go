@@ -1,7 +1,6 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog"
@@ -33,6 +32,24 @@ func (c *Command) CallMethodByType(ser *tools.StageExecutionRecord, typeName str
 	return servertools.CallMethodByName(c, ser, typeName, arg)
 }
 
+// 绑定参数
+func (c *Command) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Stage) {
+	// 获取自定义参数
+	c.config = config{
+		Command:            data.Describe["command"].(string),
+		HostConcurrentMode: data.Describe["hostConcurrentMode"].(string),
+		StepMode:           data.Describe["stepMode"].(string),
+		BetchNum:           data.Describe["betchNum"].(int),
+	}
+	c.data = data
+	c.ser = ser
+	c.stageinfo = &tools.StageInfo{HostExecuteResult: make(map[string]tools.StageHostStatus)}
+}
+
+/*
+任务处理函数
+*/
+
 func (c *Command) ExecuteCommand(ser *tools.StageExecutionRecord, data *tools.Stage) error {
 	/*
 		ser: 整个流程的执行信息结果记录 此段记录的内容会在函数执行结束后写入数据库
@@ -58,7 +75,7 @@ func (c *Command) ExecuteCommand(ser *tools.StageExecutionRecord, data *tools.St
 		// 批次 每次一批主机执行
 		klog.V(6).Infof("[command.go:ExecuteCommand]: %s operating mode: batch.", data.Name)
 	} else {
-		return errors.New(fmt.Sprintf("[command.go:ExecuteCommand]: %s operating mode: unsupported. stepMode Field is incorrect", data.Name))
+		return fmt.Errorf("[command.go:ExecuteCommand]: %s operating mode: unsupported. stepMode Field is incorrect", data.Name)
 	}
 
 	// 结束收尾 更新任务运行状态
@@ -72,19 +89,9 @@ func (c *Command) ExecuteCommand(ser *tools.StageExecutionRecord, data *tools.St
 	return nil
 }
 
-// 绑定参数
-func (c *Command) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Stage) {
-	// 获取自定义参数
-	c.config = config{
-		Command:            data.Describe["command"].(string),
-		HostConcurrentMode: data.Describe["hostConcurrentMode"].(string),
-		StepMode:           data.Describe["stepMode"].(string),
-		BetchNum:           data.Describe["betchNum"].(int),
-	}
-	c.data = data
-	c.ser = ser
-	c.stageinfo = &tools.StageInfo{HostExecuteResult: make(map[string]tools.StageHostStatus)}
-}
+/*
+模块内部其他函数
+*/
 
 // 并发执行任务
 func (c *Command) ConcurrentCommand() {
@@ -194,8 +201,7 @@ func (c *Command) SSHHostExecuteCommand(wg *sync.WaitGroup, host *tools.HostInfo
 	client, status := c.sshRemoteHost(host)
 	if !status {
 		klog.Infof("connect to host fail: %s", host.Address)
-		host.Describe = "failed!SSH connection to remote host failed."
-		return errors.New(host.Describe)
+		return fmt.Errorf("failed!SSH connection to remote host failed,connect host to %s", host.Address)
 	}
 
 	// 执行命令 获取返回结果
@@ -213,13 +219,17 @@ func (c *Command) SSHHostExecuteCommand(wg *sync.WaitGroup, host *tools.HostInfo
 func (c *Command) runCommand(client *ssh.Client, command string) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
-		return "", fmt.Errorf("failed to create session: %w", err)
+		return "", fmt.Errorf("[command.go:runCommand]: failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() {
+		if err := session.Close(); err != nil {
+			klog.V(6).Infof("[command.go:runCommand]: close session error: %v", err)
+		}
+	}()
 
 	output, err := session.CombinedOutput(command)
 	if err != nil {
-		return "", fmt.Errorf("failed to run command: %w", err)
+		return "", fmt.Errorf("[command.go:runCommand]: failed to run command: %w", err)
 	}
 
 	return string(output), nil

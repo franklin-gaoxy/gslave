@@ -64,7 +64,7 @@ func GetHostMetaWorker(host *tools.HostInfo, wg *sync.WaitGroup, pool chan struc
 	err = json.Unmarshal([]byte(strings.TrimSpace(diskinfo)), &disks)
 	var totalsize float64 = 0
 	for _, device := range disks.BlockDevices {
-		fmt.Printf("- Name: %s, Size: %d, Mountpoint: %s\n", device.Name, device.Size, device.Mountpoint)
+		klog.Infof("- Name: %s, Size: %d, Mountpoint: %s\n", device.Name, device.Size, device.Mountpoint)
 		totalsize = totalsize + float64(device.Size)
 	}
 	host.HostInfo.TotalSize = totalsize/1024/1024/1024 - 1

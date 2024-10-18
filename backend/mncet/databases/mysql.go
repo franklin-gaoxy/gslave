@@ -1,7 +1,7 @@
 package databases
 
 import (
-	"log"
+	"k8s.io/klog"
 	"mncet/mncet/tools"
 )
 
@@ -11,5 +11,5 @@ func NewMysql() *Mysql {
 	return &Mysql{}
 }
 func (m *Mysql) Init(config tools.ServerConfig) {
-	log.Println("start init ...")
+	klog.Infof("start init ...")
 }

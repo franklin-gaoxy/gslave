@@ -2,7 +2,6 @@ package servertools
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"k8s.io/klog"
@@ -86,7 +85,7 @@ func CheckHostExist(content *tools.Stage, database databases.Databases) (*[]tool
 		hosts := database.QueryHosts(key, value)
 		if hosts == nil {
 			klog.Errorf("host %s is not exist!.", host)
-			return &result, errors.New("host not exist")
+			return &result, fmt.Errorf("host %s is not exist", host)
 		} else {
 			// 循环返回的list 全部装入result
 			for _, h := range *hosts {
