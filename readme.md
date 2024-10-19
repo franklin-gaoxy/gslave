@@ -539,3 +539,6 @@ if stageInfo, exists := c.ser.StageInfos[c.data.Name]; exists {
 
 2. 实现 group 主机组的功能
 
+直接先找出所有的主机，然后创建好所有的client传递下去？
+
+hostConn需要优化，增加remotePath，用来确定连接方式到底是主机名，还是IP地址。优先使用IP地址而不是主机名。

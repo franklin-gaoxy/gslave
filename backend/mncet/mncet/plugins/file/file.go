@@ -1,6 +1,7 @@
 package file
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -8,7 +9,10 @@ import (
 	"k8s.io/klog"
 	"mncet/mncet/mncet/servertools"
 	"mncet/mncet/tools"
+	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,6 +23,7 @@ type config struct {
 	From               string `json:"from" yaml:"from"`               // 从当前主机查找
 	FromNetwork        string `json:"fromNetwork" yaml:"fromNetwork"` // 从网络下载
 	To                 string `json:"to" yaml:"to"`                   // 发送到对端主机的存储位置
+	SSLVerify          bool   `json:"sslVerify" yaml:"sslVerify"`     // 从网络下载时 是否禁用ssl认证 默认开启
 	HostConcurrentMode string `json:"hostConcurrentMode" yaml:"hostConcurrentMode"`
 }
 
@@ -77,10 +82,50 @@ func (f *File) LocalFiles(ser *tools.StageExecutionRecord, args *tools.Stage) er
 		}
 	}
 
+	// 结束收尾 更新任务运行状态
+	if stageInfo, exists := f.ser.StageInfos[f.data.Name]; exists {
+		// 只更新 Status 字段，保留其他字段
+		stageInfo.Status = "succeed"
+		f.ser.StageInfos[f.data.Name] = stageInfo
+	}
+
 	return nil
 }
 
 func (f *File) RemoteFile(ser *tools.StageExecutionRecord, args *tools.Stage) error {
+	klog.Infof("[file.go:RemoteFile]: start execute %s!", args.Name)
+	f.ParameterBinding(ser, args)
+
+	// download file
+	fileName := f.downloadFile()
+	f.conf.From = fileName
+
+	// 开始获取主机
+	switch f.conf.HostConcurrentMode {
+	case "concurrent":
+		klog.V(6).Infof("[file.go:RemoteFile]: mode:concurrent start execute %s!", args.Name)
+		// 同时执行
+		var wg sync.WaitGroup
+		for _, host := range args.HostsConn {
+			wg.Add(1)
+			go f.CopyFileToRemote(&host, &wg)
+		}
+		wg.Wait()
+	case "serial":
+		klog.V(6).Infof("[file.go:RemoteFile]: mode:serial start execute %s!", args.Name)
+		// 顺序执行
+		for _, host := range args.HostsConn {
+			f.CopyFileToRemote(&host, nil)
+		}
+	}
+
+	// 结束收尾 更新任务运行状态
+	if stageInfo, exists := f.ser.StageInfos[f.data.Name]; exists {
+		// 只更新 Status 字段，保留其他字段
+		stageInfo.Status = "succeed"
+		f.ser.StageInfos[f.data.Name] = stageInfo
+	}
+
 	return nil
 }
 
@@ -127,6 +172,10 @@ func (f *File) CreateSSHClient(host *tools.HostInfo) (*ssh.Client, bool) {
 }
 
 func (f *File) CopyFileToRemote(host *tools.HostInfo, wg *sync.WaitGroup) {
+	// 设置任务
+	f.stageinfo.Time = time.Now()
+	f.stageinfo.StageName = f.data.Name
+
 	sshconn, s := f.CreateSSHClient(host)
 	if s != true {
 		klog.Errorf("[file.go:CopyFileToRemote]: create remote client failed! exit.")
@@ -169,6 +218,13 @@ func (f *File) CopyFileToRemote(host *tools.HostInfo, wg *sync.WaitGroup) {
 		if wg != nil {
 			wg.Done()
 		}
+
+		// check error
+		if err != nil {
+			f.stageinfo.Status = "failed"
+			f.stageinfo.Event = err.Error()
+		}
+		f.ser.StageInfos[f.data.Name] = *f.stageinfo
 	}()
 }
 
@@ -281,4 +337,66 @@ func (f *File) uploadDirectory(client *sftp.Client, localDirPath string, remoteD
 		return nil
 	})
 	return err
+}
+
+func (f *File) downloadFile() string {
+	// 发起 GET 请求
+	var client *http.Client
+	if f.conf.SSLVerify == false {
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // 禁用证书验证
+			},
+		}
+	} else {
+		client = &http.Client{}
+	}
+
+	response, err := client.Get(f.conf.FromNetwork)
+	if err != nil {
+		klog.V(6).Infof("Failed to download file: %v\n", err)
+		return ""
+	}
+
+	// 检查 HTTP 响应状态码
+	if response.StatusCode != http.StatusOK {
+		klog.V(6).Infof("Failed to download file: %v\n", response.Status)
+		return ""
+	}
+
+	// 创建本地文件
+	// 解析 URL
+	parsedURL, err := url.Parse(f.conf.FromNetwork)
+	if err != nil {
+		klog.V(6).Infof("Failed to parse URL: %v\n", err)
+		return ""
+	}
+
+	// 使用 path.Base 提取路径中的文件名
+	fileName := path.Base(parsedURL.Path)
+
+	localFile, err := os.Create(fileName)
+	if err != nil {
+		klog.V(6).Infof("Failed to create file: %v\n", err)
+		return ""
+	}
+
+	// 将 HTTP 响应体中的内容复制到本地文件
+	_, err = io.Copy(localFile, response.Body)
+	if err != nil {
+		klog.V(6).Infof("Failed to save file: %v\n", err)
+		return ""
+	}
+
+	fmt.Println("File downloaded successfully!")
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			klog.Errorf("[file.go:downloadFile] close response body failed! exit.")
+		}
+		if err := localFile.Close(); err != nil {
+			klog.Errorf("[file.go:downloadFile] close local file failed! exit.")
+		}
+	}()
+
+	return fileName
 }
