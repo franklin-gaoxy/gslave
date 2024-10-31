@@ -490,42 +490,9 @@ if stageInfo, exists := c.ser.StageInfos[c.data.Name]; exists {
 }
 ```
 
-### Command
+## mode
 
-#### Command.ExecuteCommand
-
-```yaml
-      describe:
-        command: "apt-get install apt-file -y"
-        hostConcurrentMode: concurrent
-        stepMode: "serial"
-```
-
-### File
-
-#### File.LocalFiles
-
-```yaml
-      describe:
-        hostConcurrentMode: concurrent
-        from: /data/file # from host path
-        to: /data/ # to remote host path
-```
-
-
-
-#### File.RemoteFile
-
-```yaml
-      describe:
-        hostConcurrentMode: concurrent
-        fromNetwork: "https://xxx.com/files/xxx" # from network
-        to: /data/
-```
-
-
-
-
+[All modules and their functions](https://github.com/franklin-gaoxy/gslave/tree/master/backend/mncet/mncet/plugins)
 
 ---
 
