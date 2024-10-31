@@ -43,12 +43,37 @@ func (f *File) CallMethodByType(ser *tools.StageExecutionRecord, typeName string
 }
 
 func (f *File) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Stage) {
+	// 处理可选参数
+	if data.Describe["from"] != nil && data.Describe["fromNetwork"] != nil {
+		klog.Errorf("[file.go:ParameterBinding]: from and fromNetwork is nil!")
+		return
+	}
+	var from string
+	if data.Describe["from"] != nil {
+		from = data.Describe["from"].(string)
+	}
+
+	// 检查从网络下载选项是否为空
+	var fromNetwork string
+	if data.Describe["fromNetwork"] != nil {
+		fromNetwork = data.Describe["fromNetwork"].(string)
+	}
+
+	// 处理从网络下载 检查是否设置了ssl 默认为true
+	var ssl bool = true
+	if data.Describe["fromNetwork"] != nil {
+		if data.Describe["sslVerify"] != nil {
+			ssl = data.Describe["sslVerify"].(bool)
+		}
+	}
+
 	// 获取自定义参数
 	f.conf = config{
-		From:               data.Describe["from"].(string),
-		FromNetwork:        data.Describe["fromNetwork"].(string),
+		From:               from,
+		FromNetwork:        fromNetwork,
 		To:                 data.Describe["to"].(string),
 		HostConcurrentMode: data.Describe["hostConcurrentMode"].(string),
+		SSLVerify:          ssl,
 	}
 	f.data = data
 	f.ser = ser
@@ -57,6 +82,7 @@ func (f *File) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Sta
 
 /*
 任务处理函数
+支持函数: RemoteFile LocalFiles
 */
 
 func (f *File) LocalFiles(ser *tools.StageExecutionRecord, args *tools.Stage) error {
@@ -352,15 +378,21 @@ func (f *File) downloadFile() string {
 		client = &http.Client{}
 	}
 
+	klog.V(6).Infof("[file.go:downloadFile]: start download file,url is %v", f.conf.FromNetwork)
+	if f.conf.FromNetwork == "" {
+		klog.Errorf("from network is none!")
+		return ""
+	}
+
 	response, err := client.Get(f.conf.FromNetwork)
 	if err != nil {
-		klog.V(6).Infof("Failed to download file: %v\n", err)
+		klog.V(6).Infof("[file.go:downloadFile]: Failed to download file: %v\n", err)
 		return ""
 	}
 
 	// 检查 HTTP 响应状态码
 	if response.StatusCode != http.StatusOK {
-		klog.V(6).Infof("Failed to download file: %v\n", response.Status)
+		klog.V(6).Infof("[file.go:downloadFile]: Failed to download file, return status is: %v\n", response.Status)
 		return ""
 	}
 
@@ -368,7 +400,7 @@ func (f *File) downloadFile() string {
 	// 解析 URL
 	parsedURL, err := url.Parse(f.conf.FromNetwork)
 	if err != nil {
-		klog.V(6).Infof("Failed to parse URL: %v\n", err)
+		klog.V(6).Infof("[file.go:downloadFile]: Failed to parse URL: %v\n", err)
 		return ""
 	}
 
@@ -377,24 +409,25 @@ func (f *File) downloadFile() string {
 
 	localFile, err := os.Create(fileName)
 	if err != nil {
-		klog.V(6).Infof("Failed to create file: %v\n", err)
+		klog.V(6).Infof("[file.go:downloadFile]: Failed to create file: %v\n", err)
 		return ""
 	}
 
 	// 将 HTTP 响应体中的内容复制到本地文件
 	_, err = io.Copy(localFile, response.Body)
 	if err != nil {
-		klog.V(6).Infof("Failed to save file: %v\n", err)
+		klog.V(6).Infof("[file.go:downloadFile]: Failed to save file: %v\n", err)
 		return ""
 	}
 
-	fmt.Println("File downloaded successfully!")
+	//fmt.Println("File downloaded successfully!")
+	klog.V(6).Infof("[file.go:downloadFile]: File downloaded successfully!\n")
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			klog.Errorf("[file.go:downloadFile] close response body failed! exit.")
+			klog.Errorf("[file.go:downloadFile]: close response body failed! exit.")
 		}
 		if err := localFile.Close(); err != nil {
-			klog.Errorf("[file.go:downloadFile] close local file failed! exit.")
+			klog.Errorf("[file.go:downloadFile]: close local file failed! exit.")
 		}
 	}()
 

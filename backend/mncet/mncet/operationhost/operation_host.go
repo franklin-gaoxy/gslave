@@ -164,7 +164,7 @@ func sshRemoteHost(host *tools.HostInfo) (*ssh.Client, bool) {
 
 func ExecuteTasks(ID *int, RunTaskArgs *tools.RunTask, data *tools.TemplateAndValues, dbs databases.Databases) bool {
 	klog.V(6).Infof("[operation_host.go:ExecuteTasks]: ExecuteTasks start execute!")
-	klog.V(8).Infof("[operation_host.go:ExecuteTasks]: All parameters passed in: {{ RunTaskArgs }}:>>%s<<\n{{ data }}:>>%s<<\n", RunTaskArgs, data)
+	klog.V(8).Infof("[operation_host.go:ExecuteTasks]: All parameters passed in: {{ data.TemplateData }}:>>%s<<\n{{ RunTaskArgs }}:>>%s<<\n{{ data }}:>>%s<<\n", data.TemplateData, RunTaskArgs, data)
 
 	// 格式化yaml中的变量
 	var ser tools.StageExecutionRecord // 用来记录执行过程中的信息
@@ -234,5 +234,12 @@ func ExecuteTasks(ID *int, RunTaskArgs *tools.RunTask, data *tools.TemplateAndVa
 	}
 	ser.Status = "succeed"
 	dbs.SaveTaskResult(&ser)
+
+	defer func() {
+		if r := recover(); r != nil {
+			klog.Warningln("[operation_host.go:ExecuteTasks]: Function execution encountered an error: Recovered in f", r)
+		}
+	}()
+
 	return true
 }

@@ -34,12 +34,21 @@ func (c *Command) CallMethodByType(ser *tools.StageExecutionRecord, typeName str
 
 // 绑定参数
 func (c *Command) ParameterBinding(ser *tools.StageExecutionRecord, data *tools.Stage) {
+	// 处理可选参数
+	// betachNum 只有批次处理模式才会需要此参数
+	var betachNum int
+	if data.Describe["betchNum"] == nil && data.Describe["hostConcurrentMode"].(string) != "batch" {
+		betachNum = 0
+	} else {
+		betachNum = data.Describe["betchNum"].(int)
+	}
+
 	// 获取自定义参数
 	c.config = config{
 		Command:            data.Describe["command"].(string),
 		HostConcurrentMode: data.Describe["hostConcurrentMode"].(string),
 		StepMode:           data.Describe["stepMode"].(string),
-		BetchNum:           data.Describe["betchNum"].(int),
+		BetchNum:           betachNum,
 	}
 	c.data = data
 	c.ser = ser

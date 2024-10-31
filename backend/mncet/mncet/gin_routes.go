@@ -161,6 +161,11 @@ func TaskRun(c *gin.Context, database databases.Databases) {
 
 	// 根据taskName字段 从数据库找出保存的模板和变量
 	tav := database.QueryTasks(runtaskargs.TaskName)
+	klog.V(8).Infof("[gin_routes.go:TaskRun]:query tasks info:%v", tav)
+	if tav == nil {
+		c.JSON(400, gin.H{"status": "failed", "describe": "query database is nil! please check task name!"})
+		return
+	}
 
 	// 创建一个序号ID
 	ID, err := database.GenerateID()
