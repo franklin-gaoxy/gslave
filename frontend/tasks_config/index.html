@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>任务配置 - GSlave</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; --danger:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .textarea { width:100%; min-height:200px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:13px; resize:none; }
+    .input { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; width:100%; }
+    .title { font-weight:700; margin-bottom:8px; }
+    .muted { color:var(--muted); }
+    .footer { display:flex; justify-content:flex-end; margin-top:12px; }
+    .btn-green { background:#10b981; color:#fff; }
+    .list { display:flex; flex-direction:column; gap:6px; max-height:300px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; }
+    .item { display:flex; align-items:center; gap:8px; }
+  </style>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){ const L=document.getElementById('head-left'),R=document.getElementById('head-right'),S=document.getElementById('side'); L.innerHTML=''; R.innerHTML=''; S.innerHTML=''; items.forEach(it=>{ if(it.type==='head') L.appendChild(el('a',{href:it.address,className:'btn-head'},it.name)); else if(it.type==='head-end') R.appendChild(el('a',{href:it.address,className:'btn'},it.name)); else S.appendChild(el('a',{href:it.address,className:'btn secondary'},it.name)); }); }
+    async function loadNav(){ try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]);}catch(e){} }
+    const qs = new URLSearchParams(location.search);
+    const scriptId = qs.get('scriptId')||'';
+    let script = null; let machines = []; let selected = new Set();
+    async function init(){ if(!scriptId){ location.assign('/scripts_add/'); return; } await loadNav(); await loadScript(); await loadMachines(); renderTask(); renderConfig(); }
+    async function loadScript(){ const res = await fetch('/api/scripts'); if(res.status===401){ location.assign('/login/'); return; } const data = await res.json(); const items = Array.isArray(data)? data : (data.items||[]); script = items.find(x=>x.id===scriptId)||null; }
+    async function loadMachines(){ const res = await fetch('/api/machines?page=1&pageSize=100'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); machines = data.items||[]; }
+    function renderTask(){ const box=document.getElementById('taskBox'); box.innerHTML=''; const title=el('div',{className:'title'}, (script&&script.name)||'未找到脚本'); const desc=el('div',{className:'muted'}, (script&&script.description)||''); box.appendChild(title); box.appendChild(desc); }
+    function renderConfig(){
+      const hostBox=document.getElementById('hostBox'); hostBox.innerHTML='';
+      const search=el('input',{id:'hostSearch', className:'input', placeholder:'搜索主机（名称或IP）'});
+      hostBox.appendChild(search);
+      const listWrap=el('div',{className:'list'}); listWrap.id='hostList'; hostBox.appendChild(listWrap);
+      function handle(){ const q=(search.value||'').trim().toLowerCase(); renderHostList(q); }
+      search.addEventListener('input', handle);
+      search.addEventListener('keydown',(e)=>{ if(e.key==='Enter') handle(); });
+      renderHostList('');
+      const cmd=document.getElementById('cmd'); cmd.value = 'ansible-playbook -i inventory.ini playbook.yml';
+      updateInventory();
+    }
+    function renderHostList(q){
+      const list=document.getElementById('hostList'); if(!list) return; list.innerHTML='';
+      const data = machines.filter(m=>{
+        const name=(m.name||'').toLowerCase(); const ip=(m.ip||'').toLowerCase();
+        return !q || name.includes(q) || ip.includes(q);
+      });
+      data.forEach(m=>{
+        const line=el('div',{className:'item'});
+        const cb=el('input',{type:'checkbox'});
+        cb.checked = selected.has(m.id);
+        cb.addEventListener('change',()=>{ if(cb.checked) selected.add(m.id); else selected.delete(m.id); updateInventory(); });
+        line.appendChild(cb);
+        line.appendChild(el('span',null, `${m.name} (${m.ip})`));
+        list.appendChild(line);
+      });
+    }
+    function updateInventory(){ const inv=document.getElementById('inv'); const sels = machines.filter(m=> selected.has(m.id)); let text='[all]\n'; sels.forEach(m=>{ text += `${m.ip}\n`; }); inv.value = text; }
+    async function nextStep(){ const name=(script&&script.name)||'任务'; const command=document.getElementById('cmd').value.trim(); const inventory=document.getElementById('inv').value; const hostIds=Array.from(selected); if(!scriptId || !name) return; const res = await fetch('/api/tasks',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ scriptId: scriptId, name, command, inventory, hostIds })}); if(res.status===401){ location.assign('/login/'); return; } if(!res.ok) return; const data=await res.json(); const id=data.id; if(id){ location.assign(`/tasks_run/?id=${id}`); } }
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div id="side" class="list"></div>
+    </aside>
+    <main class="content">
+      <div id="taskBox" class="card"></div>
+      <div class="card" style="margin-top:12px;">
+        <div class="title">任务配置</div>
+        <div class="muted" style="margin-bottom:8px;">默认执行命令，可修改</div>
+        <input id="cmd" class="input" placeholder="命令">
+        <div class="grid" style="margin-top:12px;">
+          <div>
+            <div class="title" style="margin-bottom:6px;">主机选择</div>
+            <div id="hostBox"></div>
+          </div>
+          <div>
+            <div class="title" style="margin-bottom:6px;">Inventory</div>
+            <textarea id="inv" class="textarea" placeholder="自动生成"></textarea>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-green" type="button" onclick="nextStep()">下一步</button></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

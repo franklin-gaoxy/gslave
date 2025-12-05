@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>任务运行 - GSlave</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+    .grid { display:flex; flex-direction:column; gap:8px; }
+    .step { border:2px solid #e5e7eb; border-radius:10px; padding:10px; }
+    .ok { border-color:#10b981; }
+    .fail { border-color:#ef4444; }
+    .run { border-color:#f59e0b; }
+    .row { display:flex; align-items:center; justify-content:space-between; }
+    .log { display:none; white-space:pre-wrap; background:#fafafa; border:1px dashed var(--border); border-radius:8px; padding:8px; margin-top:6px; }
+    .btn-green { background:#10b981; color:#fff; }
+  </style>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){ const L=document.getElementById('head-left'),R=document.getElementById('head-right'),S=document.getElementById('side'); L.innerHTML=''; R.innerHTML=''; S.innerHTML=''; items.forEach(it=>{ if(it.type==='head') L.appendChild(el('a',{href:it.address,className:'btn-head'},it.name)); else if(it.type==='head-end') R.appendChild(el('a',{href:it.address,className:'btn'},it.name)); else S.appendChild(el('a',{href:it.address,className:'btn secondary'},it.name)); }); }
+    async function loadNav(){ try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]);}catch(e){} }
+    const qs = new URLSearchParams(location.search); const id = qs.get('id')||'';
+    let timer=null;
+    async function init(){ await loadNav(); await loadTask(); }
+    async function loadTask(){ if(!id){ return; } const res=await fetch('/api/tasks?id='+id); if(res.status===401){ location.assign('/login/'); return; } if(!res.ok) return; const t=await res.json(); renderTask(t); pollStatus(); }
+    function renderTask(t){ const box=document.getElementById('taskBox'); box.innerHTML=''; box.appendChild(el('div',{style:'font-weight:700;'}, t.name||('任务 '+id))); box.appendChild(el('div',{className:'muted'}, '命令: '+(t.command||''))); }
+    async function start(){ const res=await fetch('/api/tasks/start',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id })}); if(res.status===401){ location.assign('/login/'); return; } pollStatus(); }
+    async function pollStatus(){ clearInterval(timer); await refreshStatus(); timer=setInterval(refreshStatus, 5000); }
+    async function refreshStatus(){ const res=await fetch('/api/tasks/status?id='+id); if(!res.ok) return; const s=await res.json(); renderSteps(s.steps||[]); }
+    function renderSteps(steps){ const box=document.getElementById('runBox'); box.innerHTML=''; steps.forEach(st=>{ const wrap=el('div',{className:'step '+(st.status==='ok'?'ok':(st.status==='fail'?'fail':(st.status==='running'?'run':'')))}); const row=el('div',{className:'row'}); row.appendChild(el('div',null, st.name||'')); const btn=el('button',{className:'btn secondary', type:'button'},'日志 ▾'); const lg=el('div',{className:'log'}, st.log||''); btn.addEventListener('click', ()=>{ lg.style.display = lg.style.display==='none' || !lg.style.display ? 'block' : 'none'; }); row.appendChild(btn); wrap.appendChild(row); wrap.appendChild(lg); box.appendChild(wrap); }); }
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div id="side" class="list"></div>
+    </aside>
+    <main class="content">
+      <div id="taskBox" class="card"></div>
+      <div class="card" style="margin-top:12px;">
+        <div class="row" style="margin-bottom:8px;">
+          <div class="muted">任务运行进度</div>
+          <button class="btn btn-green" type="button" onclick="start()">运行</button>
+        </div>
+        <div id="runBox" class="grid"></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

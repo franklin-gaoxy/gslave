@@ -38,6 +38,7 @@
     .btn-danger .cross { font-weight:900; }
     .btn-mini { height:24px; padding:0 8px; font-size:12px; }
     .pagination { display:flex; gap:8px; justify-content:flex-end; margin:12px 16px; align-items:center; }
+    .select { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
     .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
     .modal { width:960px; max-width:95vw; max-height:90vh; background:#fff; border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,.2); display:flex; flex-direction:column; }
     .modal-header { padding:16px; border-bottom:1px solid var(--border); font-weight:600; }
@@ -92,7 +93,7 @@
         const c4=el('div',{className:'col-actions'});
         if(runMode){
           const rbtn=el('button',{className:'btn btn-green btn-mini', type:'button'},'Run');
-          rbtn.addEventListener('click', ()=>{ console.log('Run', it.id||'', it.name||''); });
+          rbtn.addEventListener('click', ()=>{ if(it && it.id){ location.assign('/tasks_config/?scriptId='+it.id); } });
           c4.appendChild(rbtn);
         }
         if(deleteMode){
@@ -141,17 +142,41 @@
       const name=document.getElementById('sName').value.trim();
       const description=document.getElementById('sDesc').value.trim();
       const content=document.getElementById('sContent').value;
-      if(!name || !content) return;
+      const files = window.__uploadFiles || [];
+      if(!name || (!content && (!files || !files.length))) return;
       if(id){
         const res=await fetch('/api/scripts',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name, description, content })});
         if(res.status===401){ location.assign('/login/'); return; }
         if(!res.ok){ const data=await res.json().catch(()=>({})); showError((data&&data.error)||'保存失败'); return; }
       } else {
-        const res=await fetch('/api/scripts',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, description, content })});
+        let res;
+        if(files && files.length){
+          res = await fetch('/api/scripts/upload',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, description, files })});
+        } else {
+          res = await fetch('/api/scripts',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, description, content })});
+        }
         if(res.status===401){ location.assign('/login/'); return; }
         if(!res.ok){ const data=await res.json().catch(()=>({})); showError((data&&data.error)||'添加失败'); return; }
       }
       closeModal(); await loadScripts();
+    }
+    function handleDirChosen(e){
+      const files = Array.from(e.target.files||[]);
+      if(!files.length){ window.__uploadFiles = []; document.getElementById('uploadInfo').textContent=''; document.getElementById('fileList').style.display='none'; return; }
+      const list = document.getElementById('fileList'); list.innerHTML=''; list.style.display='block';
+      const info = document.getElementById('uploadInfo'); info.textContent = `已选择 ${files.length} 个文件`;
+      const out = [];
+      let done = 0;
+      files.forEach(f=>{
+        const reader = new FileReader();
+        reader.onload = ()=>{
+          out.push({ path: f.webkitRelativePath || f.name, content: String(reader.result||'') });
+          done++;
+          const item = document.createElement('div'); item.textContent = f.webkitRelativePath || f.name; list.appendChild(item);
+          if(done === files.length){ window.__uploadFiles = out; }
+        };
+        reader.readAsText(f);
+      });
     }
     function showError(msg){
       let mask=document.getElementById('errorMask');
@@ -176,6 +201,10 @@
       document.getElementById('editBtn').addEventListener('click', ()=>{ editMode=!editMode; deleteMode=false; renderList(); });
       document.getElementById('cancelModal').addEventListener('click', closeModal);
       document.getElementById('saveModal').addEventListener('click', saveModal);
+      const dirInput = document.getElementById('dirPicker');
+      const chooseBtn = document.getElementById('chooseDir');
+      chooseBtn.addEventListener('click', ()=> dirInput.click());
+      dirInput.addEventListener('change', handleDirChosen);
     });
   </script>
 </head>
@@ -223,8 +252,14 @@
             <input id="sDesc" placeholder="描述">
           </div>
           <div class="row-block" style="flex:1; display:flex; flex-direction:column;">
-            <textarea id="sContent" placeholder="脚本内容（YAML）" style="flex:1;"></textarea>
-          </div>
+            <textarea id="sContent" placeholder="脚本内容（YAML）" style="flex:0 0 auto; min-height:20vh;"></textarea>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+              <button id="chooseDir" class="btn secondary" type="button">上传目录</button>
+              <div id="uploadInfo" style="color:var(--muted);"></div>
+              <input id="dirPicker" type="file" style="display:none;" webkitdirectory multiple />
+            </div>
+            <div id="fileList" style="margin-top:8px; max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; display:none;"></div>
+         </div>
         </div>
         <div class="modal-actions">
           <button id="cancelModal" class="btn secondary" type="button">取消</button>
