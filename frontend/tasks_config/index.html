@@ -71,7 +71,31 @@
         list.appendChild(line);
       });
     }
-    function updateInventory(){ const inv=document.getElementById('inv'); const sels = machines.filter(m=> selected.has(m.id)); let text='[all]\n'; sels.forEach(m=>{ text += `${m.ip}\n`; }); inv.value = text; }
+    function updateInventory(){
+      const inv=document.getElementById('inv');
+      const sels = machines.filter(m=> selected.has(m.id));
+      const allIPs = new Set();
+      const groups = new Map();
+      sels.forEach(m=>{
+        if(m && m.ip) allIPs.add(m.ip);
+        const tags = Array.isArray(m.tags) ? m.tags : [];
+        tags.forEach(t=>{
+          const key = String(t||'').trim(); if(!key) return;
+          if(!groups.has(key)) groups.set(key, new Set());
+          groups.get(key).add(m.ip);
+        });
+      });
+      let text = '';
+      const keys = Array.from(groups.keys()).sort();
+      keys.forEach(k=>{
+        text += `[${k}]\n`;
+        Array.from(groups.get(k)).forEach(ip=>{ text += `${ip}\n`; });
+        text += `\n`;
+      });
+      text += `[all]\n`;
+      Array.from(allIPs).forEach(ip=>{ text += `${ip}\n`; });
+      inv.value = text;
+    }
     async function nextStep(){ const name=(script&&script.name)||'任务'; const command=document.getElementById('cmd').value.trim(); const inventory=document.getElementById('inv').value; const hostIds=Array.from(selected); if(!scriptId || !name) return; const res = await fetch('/api/tasks',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ scriptId: scriptId, name, command, inventory, hostIds })}); if(res.status===401){ location.assign('/login/'); return; } if(!res.ok) return; const data=await res.json(); const id=data.id; if(id){ location.assign(`/tasks_run/?id=${id}`); } }
     document.addEventListener('DOMContentLoaded', init);
   </script>
