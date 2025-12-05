@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设置</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#eef2ff; color:#3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div class="list">
+        <a href="/" class="btn secondary">返回首页</a>
+        <button id="btn-settings" class="btn" type="button">按钮设置</button>
+        <div id="side" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="card">
+        <form id="form" style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="pill">按钮设置</div>
+            <span style="color:var(--muted);">类型：sied/ head/ head-end</span>
+          </div>
+          <div id="rows" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div style="display:flex; justify-content:flex-end;">
+            <button id="add" type="button" class="btn">添加</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){
+      const headLeft=document.getElementById('head-left');
+      const headRight=document.getElementById('head-right');
+      const side=document.getElementById('side');
+      headLeft.innerHTML=''; headRight.innerHTML=''; side.innerHTML='';
+      items.forEach(it=>{
+        if(it.type==='head'){
+          const a=el('a',{href:it.address,className:'btn-head'},it.name);
+          headLeft.appendChild(a);
+        } else if(it.type==='head-end'){
+          const a=el('a',{href:it.address,className:'btn'},it.name);
+          headRight.appendChild(a);
+        } else {
+          const a=el('a',{href:it.address,className:'btn secondary'},it.name);
+          side.appendChild(a);
+        }
+      });
+    }
+    function renderRows(items){
+      const rows=document.getElementById('rows');
+      rows.innerHTML='';
+      items.forEach(it=>{
+        const row=el('div',{style:'display:flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:8px; padding:8px;'});
+        const inputName=el('input',{value:it.name, placeholder:'名称', style:'flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+        const inputAddress=el('input',{value:it.address, placeholder:'地址', style:'flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+        const selectType=el('select',{style:'width:140px; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+        ['sied','head','head-end'].forEach(t=>{ const opt=el('option',{value:t},t); if(t===it.type || (t==='head-end' && it.type==='side-end')) opt.selected=true; selectType.appendChild(opt); });
+        const btnSave=el('button',{type:'button', className:'btn'},'修改');
+        const btnDel=el('button',{type:'button', className:'btn secondary'},'删除');
+        btnSave.addEventListener('click', async ()=>{
+          const payload={ name: inputName.value.trim(), address: inputAddress.value.trim(), type: selectType.value };
+          const res=await fetch('/api/homepage_button',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+          if(res.status===401){ location.assign('/login/'); return; }
+          if(res.ok){ await loadButtons(); }
+        });
+        btnDel.addEventListener('click', async ()=>{
+          const res=await fetch('/api/homepage_button',{ method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ address: inputAddress.value.trim() })});
+          if(res.status===401){ location.assign('/login/'); return; }
+          if(res.ok){ await loadButtons(); }
+        });
+        row.appendChild(inputName);
+        row.appendChild(inputAddress);
+        row.appendChild(selectType);
+        row.appendChild(btnSave);
+        row.appendChild(btnDel);
+        rows.appendChild(row);
+      });
+    }
+    async function loadButtons(){
+      const res = await fetch('/api/homepage_button');
+      if(res.status===401){ location.assign('/login/'); return; }
+      if(!res.ok) return;
+      const data = await res.json();
+      renderButtons(data||[]);
+      renderRows(data||[]);
+    }
+    document.addEventListener('DOMContentLoaded', loadButtons);
+    document.getElementById('btn-settings').addEventListener('click', loadButtons);
+    document.getElementById('add').addEventListener('click', ()=>{
+      const rows=document.getElementById('rows');
+      const row=el('div',{style:'display:flex; gap:8px; align-items:center; border:1px solid var(--border); border-radius:8px; padding:8px;'});
+      const inputName=el('input',{placeholder:'名称', style:'flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+      const inputAddress=el('input',{placeholder:'地址', style:'flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+      const selectType=el('select',{style:'width:140px; padding:8px; border:1px solid var(--border); border-radius:8px;'});
+      ['sied','head','head-end'].forEach(t=> selectType.appendChild(el('option',{value:t},t)) );
+      const btnSave=el('button',{type:'button', className:'btn'},'保存');
+      const btnDel=el('button',{type:'button', className:'btn secondary'},'删除');
+      btnSave.addEventListener('click', async ()=>{
+        const payload={ name: inputName.value.trim(), address: inputAddress.value.trim(), type: selectType.value };
+        if(!payload.name || !payload.address || !payload.type) return;
+        const res=await fetch('/api/homepage_button',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        if(res.status===401){ location.assign('/login/'); return; }
+        if(res.ok){ await loadButtons(); }
+      });
+      btnDel.addEventListener('click', ()=>{ row.remove(); });
+      row.appendChild(inputName);
+      row.appendChild(inputAddress);
+      row.appendChild(selectType);
+      row.appendChild(btnSave);
+      row.appendChild(btnDel);
+      rows.appendChild(row);
+    });
+  </script>
+</body>
+</html>

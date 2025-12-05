@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - GSlave</title>
+  <style>
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f5f7fa; }
+    .container { max-width: 360px; margin: 12vh auto; padding: 24px 28px; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.08); }
+    .brand { text-align:center; font-weight:600; font-size:20px; color:#1f2937; margin-bottom:18px; }
+    .field { margin:12px 0; }
+    label { display:block; font-size:13px; color:#4b5563; margin-bottom:6px; }
+    input { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:14px; outline:none; }
+    input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+    .error { color:#ef4444; font-size:13px; min-height:18px; margin-top:8px; }
+    .submit { width:100%; margin-top:16px; padding:10px 12px; border:none; border-radius:8px; background:#111827; color:#fff; font-weight:600; cursor:pointer; }
+    .submit:active { opacity:.9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand">GSlave 登录</div>
+    <form id="loginForm">
+      <div class="field">
+        <label for="username">用户名</label>
+        <input id="username" name="username" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">密码</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <div class="error" id="error"></div>
+      <button class="submit" type="submit">登录</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('loginForm')
+    const err = document.getElementById('error')
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      err.textContent = ''
+      const username = document.getElementById('username').value.trim()
+      const password = document.getElementById('password').value
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        })
+        if (res.ok) {
+          location.assign('/')
+        } else {
+          const data = await res.json().catch(()=>({}))
+          err.textContent = (data && data.error) || '用户名或密码错误'
+        }
+      } catch (_) {
+        err.textContent = '网络错误，请稍后重试'
+      }
+    })
+  </script>
+  </body>
+</html>

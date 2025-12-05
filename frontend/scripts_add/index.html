@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>脚本添加 - GSlave</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; --danger:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:0; box-shadow:0 8px 24px rgba(0,0,0,.04); overflow:hidden; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid var(--border); }
+    .tool-left { display:flex; gap:8px; align-items:center; }
+    .tool-right { display:flex; gap:8px; align-items:center; }
+    .input { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+    .list { display:flex; flex-direction:column; }
+    .row { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+    .col-name { flex:0 0 220px; font-weight:600; }
+    .col-desc { flex:1; color:var(--muted); }
+    .col-time { flex:0 0 240px; color:var(--muted); font-size:12px; }
+    .col-actions { flex:0 0 auto; display:flex; gap:8px; align-items:center; }
+    .btn-danger { background:var(--danger); color:#fff; }
+    .btn-green { background:#10b981; color:#fff; }
+    .btn-orange { background:#f59e0b; color:#fff; }
+    .btn-danger .cross { font-weight:900; }
+    .btn-mini { height:24px; padding:0 8px; font-size:12px; }
+    .pagination { display:flex; gap:8px; justify-content:flex-end; margin:12px 16px; align-items:center; }
+    .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
+    .modal { width:960px; max-width:95vw; max-height:90vh; background:#fff; border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,.2); display:flex; flex-direction:column; }
+    .modal-header { padding:16px; border-bottom:1px solid var(--border); font-weight:600; }
+    .modal-body { padding:16px; display:flex; flex-direction:column; gap:12px; min-height:50vh; }
+    .row-inline { display:flex; gap:12px; }
+    .row-inline input { flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
+    .row-block textarea { width:100%; resize:none; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:13px; min-height:40vh; }
+    .modal-actions { padding:16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+  </style>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){
+      const headLeft=document.getElementById('head-left');
+      const headRight=document.getElementById('head-right');
+      const side=document.getElementById('side');
+      headLeft.innerHTML=''; headRight.innerHTML=''; side.innerHTML='';
+      items.forEach(it=>{
+        if(it.type==='head') headLeft.appendChild(el('a',{href:it.address,className:'btn-head'},it.name));
+        else if(it.type==='head-end') headRight.appendChild(el('a',{href:it.address,className:'btn'},it.name));
+        else side.appendChild(el('a',{href:it.address,className:'btn secondary'},it.name));
+      });
+    }
+    async function loadNav(){
+      try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]); }catch(e){}
+    }
+
+    let scripts=[], deleteMode=false, editMode=false, runMode=false, page=1, pageSize=10, total=0;
+    async function loadScripts(){
+      const q=document.getElementById('search').value.trim();
+      const field=document.getElementById('searchField').value;
+      const qs=new URLSearchParams(); if(q) qs.set('q', q); if(field) qs.set('qField', field); qs.set('page', String(page)); qs.set('pageSize', String(pageSize));
+      const res=await fetch('/api/scripts?'+qs.toString());
+      if(res.status===401){ location.assign('/login/'); return; }
+      if(!res.ok) return;
+      const data = await res.json();
+      if(Array.isArray(data)){
+        scripts = data||[]; total = scripts.length||0; page = 1; pageSize = Math.min(pageSize, 100);
+      } else {
+        scripts = data.items||[]; total = data.total||0; page = data.page||page; pageSize = data.pageSize||pageSize;
+      }
+      renderList(); renderPager();
+    }
+    function fmtTime(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleString(); }catch(e){ return String(ts||''); } }
+    function renderList(){
+      const list=document.getElementById('list'); list.innerHTML='';
+      (scripts||[]).forEach(it=>{
+        const row=el('div',{className:'row'});
+        const c1=el('div',{className:'col-name'}, it.name||'');
+        const c2=el('div',{className:'col-desc'}, it.description||'');
+        const timeText = `创建: ${fmtTime(it.createdAt)}  修改: ${fmtTime(it.updatedAt||it.createdAt)}`;
+        const c3=el('div',{className:'col-time'}, timeText);
+        const c4=el('div',{className:'col-actions'});
+        if(runMode){
+          const rbtn=el('button',{className:'btn btn-green btn-mini', type:'button'},'Run');
+          rbtn.addEventListener('click', ()=>{ console.log('Run', it.id||'', it.name||''); });
+          c4.appendChild(rbtn);
+        }
+        if(deleteMode){
+          const btn=el('button',{className:'btn btn-danger', type:'button'},'✕');
+          btn.addEventListener('click', async ()=>{
+            if(!confirm('确认删除该脚本？')) return;
+            if(!confirm('再次确认：删除后不可恢复，是否继续？')) return;
+            const res=await fetch('/api/scripts',{ method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: it.id })});
+            if(res.status===401){ location.assign('/login/'); return; }
+            if(res.ok){ await loadScripts(); }
+          });
+          c4.appendChild(btn);
+        }
+        if(editMode){
+          const btn=el('button',{className:'btn btn-orange', type:'button'},'修改');
+          btn.addEventListener('click', ()=> openModal('修改脚本', it));
+          c4.appendChild(btn);
+        }
+        row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); row.appendChild(c4);
+        list.appendChild(row);
+      });
+    }
+    function renderPager(){
+      const pager=document.getElementById('pager');
+      if(!pager) return;
+      pager.innerHTML='';
+      const prev=document.createElement('button'); prev.className='btn secondary'; prev.textContent='上一页'; prev.addEventListener('click', ()=>{ if(page>1){ page--; loadScripts(); } });
+      const info=document.createElement('div'); info.style.color='var(--muted)'; const max=Math.ceil((total||0)/pageSize)||1; info.textContent=`第 ${page} 页 / 共 ${max} 页`;
+      const sizeSel=document.createElement('select'); sizeSel.className='select'; [10,20,50,100].forEach(n=>{ const o=document.createElement('option'); o.value=String(n); o.textContent=`每页 ${n}`; if(n===Number(pageSize)) o.selected=true; sizeSel.appendChild(o); });
+      sizeSel.addEventListener('change', ()=>{ const v=Number(sizeSel.value)||10; pageSize = Math.min(Math.max(v,1),100); page=1; loadScripts(); });
+      const next=document.createElement('button'); next.className='btn secondary'; next.textContent='下一页'; next.addEventListener('click', ()=>{ const max=Math.ceil((total||0)/pageSize)||1; if(page<max){ page++; loadScripts(); } });
+      pager.appendChild(prev); pager.appendChild(info); pager.appendChild(sizeSel); pager.appendChild(next);
+    }
+    function openModal(title, data){
+      document.getElementById('modalTitle').textContent=title;
+      document.getElementById('sName').value = (data&&data.name) || '';
+      document.getElementById('sDesc').value = (data&&data.description) || '';
+      document.getElementById('sContent').value = (data&&data.content) || '';
+      document.getElementById('modalMask').dataset.id = (data&&data.id) || '';
+      document.getElementById('modalMask').style.display='flex';
+      setTimeout(()=>{ const ta=document.getElementById('sContent'); ta.style.minHeight = Math.max(200, (window.innerHeight*0.6)) + 'px'; }, 0);
+    }
+    function closeModal(){ document.getElementById('modalMask').style.display='none'; }
+    async function saveModal(){
+      const id=document.getElementById('modalMask').dataset.id || '';
+      const name=document.getElementById('sName').value.trim();
+      const description=document.getElementById('sDesc').value.trim();
+      const content=document.getElementById('sContent').value;
+      if(!name || !content) return;
+      if(id){
+        const res=await fetch('/api/scripts',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name, description, content })});
+        if(res.status===401){ location.assign('/login/'); return; }
+        if(!res.ok){ const data=await res.json().catch(()=>({})); showError((data&&data.error)||'保存失败'); return; }
+      } else {
+        const res=await fetch('/api/scripts',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, description, content })});
+        if(res.status===401){ location.assign('/login/'); return; }
+        if(!res.ok){ const data=await res.json().catch(()=>({})); showError((data&&data.error)||'添加失败'); return; }
+      }
+      closeModal(); await loadScripts();
+    }
+    function showError(msg){
+      let mask=document.getElementById('errorMask');
+      if(!mask){
+        mask=document.createElement('div'); mask.id='errorMask'; mask.style.position='fixed'; mask.style.inset='0'; mask.style.background='rgba(0,0,0,.35)'; mask.style.display='flex'; mask.style.alignItems='center'; mask.style.justifyContent='center'; mask.style.zIndex='1300';
+        const box=document.createElement('div'); box.style.background='#fff'; box.style.borderRadius='12px'; box.style.boxShadow='0 12px 36px rgba(0,0,0,.2)'; box.style.padding='20px'; box.style.minWidth='280px';
+        const title=document.createElement('div'); title.textContent='错误'; title.style.fontWeight='600'; title.style.marginBottom='8px'; box.appendChild(title);
+        const content=document.createElement('div'); content.id='errorContent'; content.style.color= 'var(--danger)'; content.style.marginBottom='12px'; box.appendChild(content);
+        const btn=document.createElement('button'); btn.textContent='关闭'; btn.className='btn'; btn.addEventListener('click', ()=>{ mask.style.display='none'; }); box.appendChild(btn);
+        mask.appendChild(box); document.body.appendChild(mask);
+      }
+      document.getElementById('errorContent').textContent = msg;
+      mask.style.display='flex';
+    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      loadNav(); loadScripts();
+      document.getElementById('search').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ loadScripts(); } });
+      document.getElementById('searchBtn').addEventListener('click', loadScripts);
+      document.getElementById('runBtn').addEventListener('click', ()=>{ runMode=!runMode; editMode=false; deleteMode=false; renderList(); });
+      document.getElementById('addBtn').addEventListener('click', ()=> openModal('添加脚本'));
+      document.getElementById('delBtn').addEventListener('click', ()=>{ deleteMode=!deleteMode; editMode=false; renderList(); });
+      document.getElementById('editBtn').addEventListener('click', ()=>{ editMode=!editMode; deleteMode=false; renderList(); });
+      document.getElementById('cancelModal').addEventListener('click', closeModal);
+      document.getElementById('saveModal').addEventListener('click', saveModal);
+    });
+  </script>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div id="side" class="list"></div>
+    </aside>
+    <main class="content">
+      <div class="card">
+        <div class="toolbar">
+          <div class="tool-left">
+            <input id="search" class="input" placeholder="按名称或描述搜索">
+            <select id="searchField" class="input" style="width:140px;">
+              <option value="">全部字段</option>
+              <option value="name">名称</option>
+              <option value="description">描述</option>
+            </select>
+            <button id="searchBtn" class="btn" type="button">搜索</button>
+          </div>
+          <div class="tool-right">
+            <button id="runBtn" class="btn btn-green" type="button">运行</button>
+            <button id="editBtn" class="btn btn-orange" type="button">修改</button>
+            <button id="delBtn" class="btn btn-danger" type="button">删除</button>
+            <button id="addBtn" class="btn" type="button">添加</button>
+          </div>
+        </div>
+        <div id="list" class="list"></div>
+        <div id="pager" class="pagination"></div>
+      </div>
+    </main>
+    <div id="modalMask" class="modal-mask">
+      <div class="modal">
+        <div id="modalTitle" class="modal-header">添加脚本</div>
+        <div class="modal-body">
+          <div class="row-inline">
+            <input id="sName" placeholder="名称">
+            <input id="sDesc" placeholder="描述">
+          </div>
+          <div class="row-block" style="flex:1; display:flex; flex-direction:column;">
+            <textarea id="sContent" placeholder="脚本内容（YAML）" style="flex:1;"></textarea>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelModal" class="btn secondary" type="button">取消</button>
+          <button id="saveModal" class="btn" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

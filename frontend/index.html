@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GSlave 首页</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div id="side" class="list"></div>
+    </aside>
+    <main class="content">
+      <div class="card">Hello World</div>
+    </main>
+  </div>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){
+      const headLeft=document.getElementById('head-left');
+      const headRight=document.getElementById('head-right');
+      const side=document.getElementById('side');
+      headLeft.innerHTML=''; headRight.innerHTML=''; side.innerHTML='';
+      items.forEach(it=>{
+        if(it.type==='head'){
+          const a=el('a',{href:it.address,className:'btn-head'},it.name);
+          headLeft.appendChild(a);
+        } else if(it.type==='head-end'){
+          const a=el('a',{href:it.address,className:'btn'},it.name);
+          headRight.appendChild(a);
+        } else {
+          const a=el('a',{href:it.address,className:'btn secondary'},it.name);
+          side.appendChild(a);
+        }
+      });
+    }
+    async function loadButtons(){
+      try {
+        const res = await fetch('/api/homepage_button');
+        if(res.status===401){ location.assign('/login/'); return; }
+        if(!res.ok) return;
+        const data = await res.json();
+        renderButtons(data||[]);
+      } catch (e) {}
+    }
+    document.addEventListener('DOMContentLoaded', loadButtons);
+  </script>
+</body>
+</html>
