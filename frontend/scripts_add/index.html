@@ -39,10 +39,13 @@
     .btn-mini { height:24px; padding:0 8px; font-size:12px; }
     .pagination { display:flex; gap:8px; justify-content:flex-end; margin:12px 16px; align-items:center; }
     .select { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
+    .file-list { display:flex; flex-wrap:wrap; gap:6px; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px; }
+    .file-item { display:inline-flex; align-items:center; border:1px solid var(--border); border-radius:999px; padding:4px 10px; background:#fff; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .file-item-title { font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
     .modal { width:960px; max-width:95vw; max-height:90vh; background:#fff; border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,.2); display:flex; flex-direction:column; }
     .modal-header { padding:16px; border-bottom:1px solid var(--border); font-weight:600; }
-    .modal-body { padding:16px; display:flex; flex-direction:column; gap:12px; min-height:50vh; }
+    .modal-body { padding:16px; display:flex; flex-direction:column; gap:12px; flex:1; overflow:auto; min-height:0; }
     .row-inline { display:flex; gap:12px; }
     .row-inline input { flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
     .row-block textarea { width:100%; resize:none; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:13px; min-height:40vh; }
@@ -160,10 +163,10 @@
       }
       closeModal(); await loadScripts();
     }
-    function handleDirChosen(e){
+function handleDirChosen(e){
       const files = Array.from(e.target.files||[]);
       if(!files.length){ window.__uploadFiles = []; document.getElementById('uploadInfo').textContent=''; document.getElementById('fileList').style.display='none'; return; }
-      const list = document.getElementById('fileList'); list.innerHTML=''; list.style.display='block';
+      const list = document.getElementById('fileList'); list.innerHTML=''; list.style.display='flex';
       const info = document.getElementById('uploadInfo'); info.textContent = `已选择 ${files.length} 个文件`;
       const out = [];
       let done = 0;
@@ -172,7 +175,7 @@
         reader.onload = ()=>{
           out.push({ path: f.webkitRelativePath || f.name, content: String(reader.result||'') });
           done++;
-          const item = document.createElement('div'); item.textContent = f.webkitRelativePath || f.name; list.appendChild(item);
+          const item = document.createElement('div'); item.className='file-item'; item.textContent = f.webkitRelativePath || f.name; list.appendChild(item);
           if(done === files.length){ window.__uploadFiles = out; }
         };
         reader.readAsText(f);
@@ -258,7 +261,7 @@
               <div id="uploadInfo" style="color:var(--muted);"></div>
               <input id="dirPicker" type="file" style="display:none;" webkitdirectory multiple />
             </div>
-            <div id="fileList" style="margin-top:8px; max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; display:none;"></div>
+            <div id="fileList" class="file-list" style="margin-top:8px; display:none;"></div>
          </div>
         </div>
         <div class="modal-actions">

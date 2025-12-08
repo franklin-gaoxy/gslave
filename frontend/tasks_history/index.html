@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>历史任务 - GSlave</title>
+  <style>
+    :root { --brand:#111827; --bg:#f5f7fa; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --btn:#2563eb; --btnText:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); }
+    .header { height:56px; display:flex; align-items:center; padding:0 16px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+    .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; margin-right:12px; }
+    .head-left { display:flex; gap:8px; align-items:center; }
+    .spacer { flex:1; }
+    .head-right { display:flex; gap:8px; align-items:center; }
+    .layout { display:flex; min-height: calc(100vh - 56px); }
+    .sidebar { width:220px; background:#fff; border-right:1px solid var(--border); }
+    .sidebar .section { padding:12px; color:var(--muted); font-size:13px; border-bottom:1px solid var(--border); }
+    .sidebar .list { padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .content { flex:1; padding:20px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; background:var(--btn); color:var(--btnText); text-decoration:none; font-size:13px; }
+    .btn.secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-head { display:inline-flex; align-items:center; gap:8px; padding:0 10px; margin:0 6px; background:transparent; border:none; color:var(--brand); text-decoration:none; font-size:15px; font-weight:600; }
+    .toolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+    .input { padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; }
+    .grid { display:flex; flex-direction:column; gap:8px; }
+    .row { display:grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 0.8fr auto; gap:8px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:10px; }
+    .muted { color:var(--muted); }
+    .status-ok { color:#10b981; }
+    .status-fail { color:#ef4444; }
+    .log { display:none; white-space:pre-wrap; background:#fafafa; border:1px dashed var(--border); border-radius:8px; padding:8px; margin-top:6px; }
+    .pagination { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+  </style>
+  <script>
+    function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
+    function renderButtons(items){ const L=document.getElementById('head-left'),R=document.getElementById('head-right'),S=document.getElementById('side'); L.innerHTML=''; R.innerHTML=''; S.innerHTML=''; items.forEach(it=>{ if(it.type==='head') L.appendChild(el('a',{href:it.address,className:'btn-head'},it.name)); else if(it.type==='head-end') R.appendChild(el('a',{href:it.address,className:'btn'},it.name)); else S.appendChild(el('a',{href:it.address,className:'btn secondary'},it.name)); }); }
+    async function loadNav(){ try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]);}catch(e){} }
+    const qs = new URLSearchParams(location.search); let taskId = qs.get('taskId')||''; let page=1, pageSize=20, total=0; let expanded=new Set(); let items=[];
+    async function init(){ await loadNav(); renderToolbar(); await fetchList(); }
+    function renderToolbar(){ const bar=document.getElementById('toolbar'); bar.innerHTML=''; const sizeSel=el('select',{id:'size',className:'input'}); [10,20,50,100].forEach(n=>{ const o=el('option',{value:String(n)}, '每页 '+n); if(n===pageSize) o.selected=true; sizeSel.appendChild(o); }); const btn=el('button',{className:'btn',type:'button'},'刷新'); btn.addEventListener('click', ()=>{ pageSize=Number(document.getElementById('size').value)||20; page=1; fetchList(); }); bar.appendChild(sizeSel); bar.appendChild(btn); }
+    async function fetchList(){ const url=`/api/tasks/history_recent?page=${page}&pageSize=${pageSize}`; const res=await fetch(url); if(res.status===401){ location.assign('/login/'); return; } if(!res.ok) return; const data=await res.json(); items=data.items||[]; total=data.total||0; renderList(); renderPager(); }
+    function renderList(){ const box=document.getElementById('list'); box.innerHTML=''; items.forEach(it=>{ const row=el('div',{className:'row'}); row.appendChild(el('div',null,it.name||'')); const st=el('div',{className:(it.status==='ok'?'status-ok':'status-fail')}, it.status||''); row.appendChild(st); row.appendChild(el('div',{className:'muted'}, fmt(it.startedAt))); row.appendChild(el('div',{className:'muted'}, fmt(it.endedAt))); row.appendChild(el('div',{className:'muted'}, (it.command||'').slice(0,80))); const actions=el('div'); const btn=el('button',{className:'btn secondary',type:'button'},'日志 ▾'); const lg=el('div',{className:'log'}, joinLogs(it.steps||[])); const key=it.id||''; lg.style.display = expanded.has(key) ? 'block' : 'none'; btn.addEventListener('click', ()=>{ const open=lg.style.display==='block'; lg.style.display=open?'none':'block'; if(open) expanded.delete(key); else expanded.add(key); }); const run=el('a',{className:'btn secondary',href:'/tasks_run/?id='+encodeURIComponent(it.taskId||'')},'打开运行页'); actions.appendChild(btn); actions.appendChild(run); row.appendChild(actions); box.appendChild(row); box.appendChild(lg); }); }
+    function joinLogs(steps){ let s=''; (steps||[]).forEach(st=>{ s += (st.name?('### '+st.name+'\n'):''); s += (st.log||'') + '\n'; }); return s; }
+    function renderPager(){ const pg=document.getElementById('pager'); pg.innerHTML=''; const max=Math.max(1, Math.ceil((total||0)/pageSize)); const prev=el('button',{className:'btn secondary',type:'button'},'上一页'); prev.addEventListener('click',()=>{ if(page>1){ page--; fetchList(); } }); const info=el('div',{className:'muted'},`第 ${page} 页 / 共 ${max} 页`); const next=el('button',{className:'btn secondary',type:'button'},'下一页'); next.addEventListener('click',()=>{ if(page<max){ page++; fetchList(); } }); pg.appendChild(prev); pg.appendChild(info); pg.appendChild(next); }
+    function fmt(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleString(); }catch(e){ return String(ts||''); } }
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">GSlave</div>
+    <div id="head-left" class="head-left"></div>
+    <div class="spacer"></div>
+    <div id="head-right" class="head-right"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="侧边栏">
+      <div class="section">导航</div>
+      <div id="side" class="list"></div>
+    </aside>
+    <main class="content">
+      <div class="card">
+        <div id="toolbar" class="toolbar"></div>
+        <div id="list" class="grid"></div>
+        <div id="pager" class="pagination"></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

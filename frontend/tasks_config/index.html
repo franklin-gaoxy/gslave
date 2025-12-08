@@ -31,6 +31,13 @@
     .btn-green { background:#10b981; color:#fff; }
     .list { display:flex; flex-direction:column; gap:6px; max-height:300px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; }
     .item { display:flex; align-items:center; gap:8px; }
+    .vars-wrap { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+    .hint { color:var(--muted); font-size:12px; }
+    .dropdown-row { position:relative; display:flex; gap:8px; align-items:center; }
+    .icon-btn { border:none; background:transparent; color:var(--text); height:30px; width:30px; font-size:18px; line-height:1; cursor:pointer; }
+    .dropdown-menu { position:absolute; top:100%; left:0; right:0; z-index:20; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.08); max-height:220px; overflow:auto; padding:6px; display:none; }
+    .dropdown-item { padding:6px 8px; border-radius:6px; cursor:pointer; }
+    .dropdown-item:hover { background:#f3f4f6; }
   </style>
   <script>
     function el(tag, attrs, text){ const e=document.createElement(tag); if(attrs) Object.assign(e, attrs); if(text) e.textContent=text; return e; }
@@ -38,12 +45,27 @@
     async function loadNav(){ try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]);}catch(e){} }
     const qs = new URLSearchParams(location.search);
     const scriptId = qs.get('scriptId')||'';
-    let script = null; let machines = []; let selected = new Set();
+    let script = null; let machines = []; let selected = new Set(); let varsFiles = []; let selectedVar = '';
     async function init(){ if(!scriptId){ location.assign('/scripts_add/'); return; } await loadNav(); await loadScript(); await loadMachines(); renderTask(); renderConfig(); }
-    async function loadScript(){ const res = await fetch('/api/scripts'); if(res.status===401){ location.assign('/login/'); return; } const data = await res.json(); const items = Array.isArray(data)? data : (data.items||[]); script = items.find(x=>x.id===scriptId)||null; }
+    async function loadScript(){ const res = await fetch('/api/scripts'); if(res.status===401){ location.assign('/login/'); return; } const data = await res.json(); const items = Array.isArray(data)? data : (data.items||[]); script = items.find(x=>x.id===scriptId)||null; const files = (script && Array.isArray(script.files)) ? script.files : []; varsFiles = files.map(f=> String(f.path||'')).filter(p=> !!p).filter(p=> /\.(ya?ml|json)$/i.test(p)); }
     async function loadMachines(){ const res = await fetch('/api/machines?page=1&pageSize=100'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); machines = data.items||[]; }
     function renderTask(){ const box=document.getElementById('taskBox'); box.innerHTML=''; const title=el('div',{className:'title'}, (script&&script.name)||'未找到脚本'); const desc=el('div',{className:'muted'}, (script&&script.description)||''); box.appendChild(title); box.appendChild(desc); }
     function renderConfig(){
+      const varsBox=document.getElementById('varsBox'); if(varsBox){
+        varsBox.innerHTML='';
+        const varsTitle=el('div',{className:'title'},'Vars 文件'); varsBox.appendChild(varsTitle);
+        const row=el('div',{className:'dropdown-row'});
+        const varsSearch=el('input',{id:'varsSearch', className:'input', placeholder:'输入过滤或选择文件名'});
+        const toggleBtn=el('button',{className:'icon-btn', type:'button'},'▾');
+        const menu=el('div',{id:'varsDropdown', className:'dropdown-menu'});
+        row.appendChild(varsSearch); row.appendChild(toggleBtn); row.appendChild(menu); varsBox.appendChild(row);
+        const hint=el('div',{className:'hint'}, '支持上传目录中的 .yml/.yaml/.json 文件'); varsBox.appendChild(hint);
+        function renderMenu(q){ const low=(q||'').toLowerCase(); menu.innerHTML=''; (varsFiles||[]).filter(p=> !low || p.toLowerCase().includes(low)).forEach(p=>{ const it=el('div',{className:'dropdown-item'}, p); it.addEventListener('click',()=>{ selectedVar=p; varsSearch.value=p; applyVarsToCmd(); menu.style.display='none'; }); menu.appendChild(it); }); }
+        function applyVarsToCmd(){ const cmd=document.getElementById('cmd'); const v=selectedVar.trim(); let cur=cmd.value||''; cur = cur.replace(/\s+-e\s+@[^\s]+/g,''); if(v){ cur = `${cur} -e @${v}`; } cmd.value=cur.trim(); }
+        varsSearch.addEventListener('input', ()=>{ if(menu.style.display==='block'){ renderMenu(varsSearch.value); } });
+        toggleBtn.addEventListener('click', ()=>{ const open = menu.style.display==='block'; if(open){ menu.style.display='none'; } else { renderMenu(varsSearch.value); menu.style.display='block'; } });
+        document.addEventListener('click', (e)=>{ if(!row.contains(e.target)) menu.style.display='none'; });
+      }
       const hostBox=document.getElementById('hostBox'); hostBox.innerHTML='';
       const search=el('input',{id:'hostSearch', className:'input', placeholder:'搜索主机（名称或IP）'});
       hostBox.appendChild(search);
@@ -120,6 +142,7 @@
         <input id="cmd" class="input" placeholder="命令">
         <div class="grid" style="margin-top:12px;">
           <div>
+            <div class="vars-wrap" id="varsBox"></div>
             <div class="title" style="margin-bottom:6px;">主机选择</div>
             <div id="hostBox"></div>
           </div>
