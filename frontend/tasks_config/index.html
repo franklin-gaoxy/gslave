@@ -45,10 +45,10 @@
     async function loadNav(){ try{ const res=await fetch('/api/homepage_button'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); renderButtons(data||[]);}catch(e){} }
     const qs = new URLSearchParams(location.search);
     const scriptId = qs.get('scriptId')||'';
-    let script = null; let machines = []; let selected = new Set(); let varsFiles = []; let selectedVar = '';
+    let script = null; let machines = []; let machineMap = new Map(); let selected = new Set(); let varsFiles = []; let startFiles = []; let selectedVar = ''; let selectedPlaybook = 'ansible_nginx_setup/playbook.yaml';
     async function init(){ if(!scriptId){ location.assign('/scripts_add/'); return; } await loadNav(); await loadScript(); await loadMachines(); renderTask(); renderConfig(); }
-    async function loadScript(){ const res = await fetch('/api/scripts'); if(res.status===401){ location.assign('/login/'); return; } const data = await res.json(); const items = Array.isArray(data)? data : (data.items||[]); script = items.find(x=>x.id===scriptId)||null; const files = (script && Array.isArray(script.files)) ? script.files : []; varsFiles = files.map(f=> String(f.path||'')).filter(p=> !!p).filter(p=> /\.(ya?ml|json)$/i.test(p)); }
-    async function loadMachines(){ const res = await fetch('/api/machines?page=1&pageSize=100'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); machines = data.items||[]; }
+    async function loadScript(){ const res = await fetch('/api/scripts'); if(res.status===401){ location.assign('/login/'); return; } const data = await res.json(); const items = Array.isArray(data)? data : (data.items||[]); script = items.find(x=>x.id===scriptId)||null; const files = (script && Array.isArray(script.files)) ? script.files : []; varsFiles = files.map(f=> String(f.path||'')); varsFiles = varsFiles.filter(p=> !!p).filter(p=> /\.(ya?ml|json)$/i.test(p)); startFiles = files.map(f=> String(f.path||'')); startFiles = startFiles.filter(p=> !!p).filter(p=> /\.(ya?ml)$/i.test(p)); }
+    async function loadMachines(){ const res = await fetch('/api/machines?page=1&pageSize=100&includeCreds=true'); if(res.status===401){ location.assign('/login/'); return; } const data=await res.json(); machines = data.items||[]; machineMap.clear(); (machines||[]).forEach(m=>{ if(m && m.id) machineMap.set(m.id, m); }); }
     function renderTask(){ const box=document.getElementById('taskBox'); box.innerHTML=''; const title=el('div',{className:'title'}, (script&&script.name)||'未找到脚本'); const desc=el('div',{className:'muted'}, (script&&script.description)||''); box.appendChild(title); box.appendChild(desc); }
     function renderConfig(){
       const varsBox=document.getElementById('varsBox'); if(varsBox){
@@ -60,11 +60,26 @@
         const menu=el('div',{id:'varsDropdown', className:'dropdown-menu'});
         row.appendChild(varsSearch); row.appendChild(toggleBtn); row.appendChild(menu); varsBox.appendChild(row);
         const hint=el('div',{className:'hint'}, '支持上传目录中的 .yml/.yaml/.json 文件'); varsBox.appendChild(hint);
-        function renderMenu(q){ const low=(q||'').toLowerCase(); menu.innerHTML=''; (varsFiles||[]).filter(p=> !low || p.toLowerCase().includes(low)).forEach(p=>{ const it=el('div',{className:'dropdown-item'}, p); it.addEventListener('click',()=>{ selectedVar=p; varsSearch.value=p; applyVarsToCmd(); menu.style.display='none'; }); menu.appendChild(it); }); }
-        function applyVarsToCmd(){ const cmd=document.getElementById('cmd'); const v=selectedVar.trim(); let cur=cmd.value||''; cur = cur.replace(/\s+-e\s+@[^\s]+/g,''); if(v){ cur = `${cur} -e @${v}`; } cmd.value=cur.trim(); }
+        function renderMenu(q){ const low=(q||'').toLowerCase(); menu.innerHTML=''; (varsFiles||[]).filter(p=> !low || p.toLowerCase().includes(low)).forEach(p=>{ const it=el('div',{className:'dropdown-item'}, p); it.addEventListener('click',()=>{ selectedVar=p; varsSearch.value=p; updateCommand(); menu.style.display='none'; }); menu.appendChild(it); }); }
+        function applyVarsToCmd(){ updateCommand(); }
         varsSearch.addEventListener('input', ()=>{ if(menu.style.display==='block'){ renderMenu(varsSearch.value); } });
         toggleBtn.addEventListener('click', ()=>{ const open = menu.style.display==='block'; if(open){ menu.style.display='none'; } else { renderMenu(varsSearch.value); menu.style.display='block'; } });
-        document.addEventListener('click', (e)=>{ if(!row.contains(e.target)) menu.style.display='none'; });
+      document.addEventListener('click', (e)=>{ if(!row.contains(e.target)) menu.style.display='none'; });
+      }
+      // 启动文件选择
+      const startBox=document.getElementById('startBox'); if(startBox){
+        startBox.innerHTML='';
+        const sTitle=el('div',{className:'title'},'启动文件'); startBox.appendChild(sTitle);
+        const sRow=el('div',{className:'dropdown-row'});
+        const sSearch=el('input',{id:'startSearch', className:'input', placeholder:'输入过滤或选择启动文件'});
+        const sToggle=el('button',{className:'icon-btn', type:'button'},'▾');
+        const sMenu=el('div',{id:'startDropdown', className:'dropdown-menu'});
+        sRow.appendChild(sSearch); sRow.appendChild(sToggle); sRow.appendChild(sMenu); startBox.appendChild(sRow);
+        const sHint=el('div',{className:'hint'}, '默认目录：ansible_nginx_setup'); startBox.appendChild(sHint);
+        function renderStartMenu(q){ const low=(q||'').toLowerCase(); sMenu.innerHTML=''; (startFiles||[]).filter(p=> !low || p.toLowerCase().includes(low)).forEach(p=>{ const it=el('div',{className:'dropdown-item'}, p); it.addEventListener('click',()=>{ const rel = p.trim(); selectedPlaybook = rel.startsWith('ansible_nginx_setup/') ? rel : ('ansible_nginx_setup/'+rel); sSearch.value=rel; updateCommand(); sMenu.style.display='none'; }); sMenu.appendChild(it); }); }
+        sSearch.addEventListener('input', ()=>{ if(sMenu.style.display==='block'){ renderStartMenu(sSearch.value); } });
+        sToggle.addEventListener('click', ()=>{ const open = sMenu.style.display==='block'; if(open){ sMenu.style.display='none'; } else { renderStartMenu(sSearch.value); sMenu.style.display='block'; } });
+        document.addEventListener('click', (e)=>{ if(!sRow.contains(e.target)) sMenu.style.display='none'; });
       }
       const hostBox=document.getElementById('hostBox'); hostBox.innerHTML='';
       const search=el('input',{id:'hostSearch', className:'input', placeholder:'搜索主机（名称或IP）'});
@@ -74,7 +89,7 @@
       search.addEventListener('input', handle);
       search.addEventListener('keydown',(e)=>{ if(e.key==='Enter') handle(); });
       renderHostList('');
-      const cmd=document.getElementById('cmd'); cmd.value = 'ansible-playbook -i inventory.ini playbook.yml';
+      updateCommand();
       updateInventory();
     }
     function renderHostList(q){
@@ -87,37 +102,64 @@
         const line=el('div',{className:'item'});
         const cb=el('input',{type:'checkbox'});
         cb.checked = selected.has(m.id);
-        cb.addEventListener('change',()=>{ if(cb.checked) selected.add(m.id); else selected.delete(m.id); updateInventory(); });
+        cb.addEventListener('change',async ()=>{ if(cb.checked){ selected.add(m.id); await ensureMachineCreds(m.id); } else { selected.delete(m.id); } updateInventory(); });
         line.appendChild(cb);
-        line.appendChild(el('span',null, `${m.name} (${m.ip})`));
+        const creds = (m.key && m.key.trim()) ? 'key' : ((m.password && m.password.trim()) ? 'password' : 'none');
+        const info = `${m.name||''} (${m.ip||''})` + (creds!=='none'?`  [${creds}]`:``);
+        line.appendChild(el('span',null, info));
         list.appendChild(line);
       });
     }
-    function updateInventory(){
+    async function ensureMachineCreds(id){
+      const cur = machineMap.get(id);
+      const hasKey = cur && cur.key && cur.key.trim();
+      const hasPass = cur && cur.password && cur.password.trim();
+      if(hasKey || hasPass) return;
+      const res = await fetch('/api/machines_one?id='+encodeURIComponent(id)+'&includeCreds=true');
+      if(!res.ok) return; const m = await res.json(); if(m && m.id){ machineMap.set(m.id, m); const idx = machines.findIndex(x=>x.id===m.id); if(idx>=0) machines[idx]=m; }
+    }
+    async function updateInventory(){
       const inv=document.getElementById('inv');
-      const sels = machines.filter(m=> selected.has(m.id));
-      const allIPs = new Set();
+      const baseSel = machines.filter(m=> selected.has(m.id));
+      for(const m of baseSel){ const cur = machineMap.get(m.id) || m; const hasKey=cur&&cur.key&&cur.key.trim(); const hasPass=cur&&cur.password&&cur.password.trim(); if(!hasKey && !hasPass){ await ensureMachineCreds(m.id); } }
+      const sels = baseSel.map(m=> machineMap.get(m.id) || m);
+      const allIPs = new Map();
       const groups = new Map();
       sels.forEach(m=>{
-        if(m && m.ip) allIPs.add(m.ip);
+        if(m && m.ip){ allIPs.set(m.ip, m); }
         const tags = Array.isArray(m.tags) ? m.tags : [];
         tags.forEach(t=>{
           const key = String(t||'').trim(); if(!key) return;
-          if(!groups.has(key)) groups.set(key, new Set());
-          groups.get(key).add(m.ip);
+          if(!groups.has(key)) groups.set(key, new Map());
+          groups.get(key).set(m.ip, m);
         });
       });
       let text = '';
       const keys = Array.from(groups.keys()).sort();
       keys.forEach(k=>{
         text += `[${k}]\n`;
-        Array.from(groups.get(k)).forEach(ip=>{ text += `${ip}\n`; });
+        Array.from(groups.get(k).values()).forEach(m=>{ text += buildHostLine(m) + '\n'; });
         text += `\n`;
       });
       text += `[all]\n`;
-      Array.from(allIPs).forEach(ip=>{ text += `${ip}\n`; });
+      Array.from(allIPs.values()).forEach(m=>{ text += buildHostLine(m) + '\n'; });
       inv.value = text;
     }
+    function buildHostLine(m){
+      const ip = m.ip || '';
+      const user = (m.username||'').trim() || 'root';
+      const port = (m.port||'').trim() || '22';
+      const key = (m.key||'').trim();
+      const pass = (m.password||'').trim();
+      let line = `${ip} ansible_user=${user} ansible_port=${port}`;
+      if(key){
+        line += ` ansible_ssh_private_key_file=keys/${m.id}.pem`;
+      } else if(pass){
+        line += ` ansible_password=${pass}`;
+      }
+      return line;
+    }
+    function updateCommand(){ const cmd=document.getElementById('cmd'); const v=selectedVar.trim(); const play=selectedPlaybook.trim()||'ansible_nginx_setup/playbook.yaml'; let base=`ansible-playbook -i inventory.ini ${play}`; if(v){ base += ` -e @${v}`; } cmd.value = base; }
     async function nextStep(){ const name=(script&&script.name)||'任务'; const command=document.getElementById('cmd').value.trim(); const inventory=document.getElementById('inv').value; const hostIds=Array.from(selected); if(!scriptId || !name) return; const res = await fetch('/api/tasks',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ scriptId: scriptId, name, command, inventory, hostIds })}); if(res.status===401){ location.assign('/login/'); return; } if(!res.ok) return; const data=await res.json(); const id=data.id; if(id){ location.assign(`/tasks_run/?id=${id}`); } }
     document.addEventListener('DOMContentLoaded', init);
   </script>
@@ -143,6 +185,7 @@
         <div class="grid" style="margin-top:12px;">
           <div>
             <div class="vars-wrap" id="varsBox"></div>
+            <div class="vars-wrap" id="startBox"></div>
             <div class="title" style="margin-bottom:6px;">主机选择</div>
             <div id="hostBox"></div>
           </div>

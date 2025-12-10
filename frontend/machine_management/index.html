@@ -190,51 +190,36 @@
         const tdTags = document.createElement('td');
         const tdOps = document.createElement('td');
         if(edit){
-          const inName=el('input',{className:'input', value:it.name, disabled:true});
-          const inIP=el('input',{className:'input', value:it.ip, disabled:true});
-          const inCPU=el('input',{className:'input naked small', value:it.cpu, disabled:true});
-          const inMem=el('input',{className:'input naked small', value:it.memory, disabled:true});
-          const inDisk=el('input',{className:'input naked small', value:it.disk, disabled:true});
-          const inData=el('input',{className:'input', value:it.dataDisk, disabled:true});
-          const inDesc=el('input',{className:'input', value:it.description, disabled:true});
-          tdName.appendChild(inName); tdIP.appendChild(inIP); tdCPU.appendChild(inCPU); tdMem.appendChild(inMem); tdDisk.appendChild(inDisk); tdDataDisk.appendChild(inData); tdDesc.appendChild(inDesc);
-          const tagBox=document.createElement('div'); tagBox.className='tags-wrap'; tagBox.style.position='relative';
+          tdName.textContent=it.name; tdIP.textContent=it.ip; tdCPU.textContent=it.cpu; tdMem.textContent=it.memory; tdDisk.textContent=it.disk; tdDataDisk.textContent=it.dataDisk; tdDesc.textContent=it.description;
+          const tagBox=document.createElement('div'); tagBox.className='tags-wrap';
           const tagsArr = Array.isArray(it.tags) ? it.tags : [];
           if(tagsArr.length===0){ tagBox.textContent='—'; }
           tagsArr.forEach(t=> tagBox.appendChild(chip(t)) );
-          const addTagInput=el('input',{className:'input', placeholder:'添加标签', disabled:true});
-          const addTagBtn=el('button',{className:'btn secondary', type:'button'},'添加标签');
-          const arrowBtn=el('button',{className:'arrow', type:'button'},'▾');
-          const pop=el('div',{className:'tag-pop'});
-          const tagInputWrap=document.createElement('div');
-          tagInputWrap.style.display='flex'; tagInputWrap.style.alignItems='center'; tagInputWrap.style.gap='6px'; tagInputWrap.style.position='relative';
-          addTagInput.style.flex='1';
-          tagInputWrap.appendChild(addTagInput);
-          tagInputWrap.appendChild(addTagBtn);
-          tagInputWrap.appendChild(arrowBtn);
-          tagInputWrap.appendChild(pop);
-          let allTags=[];
-          async function ensureTags(){ if(allTags.length) return; const res=await fetch('/api/machines/tags'); if(res.ok){ const data=await res.json(); allTags=(data.items||[]); } }
-          function renderPop(){ const q=addTagInput.value.trim().toLowerCase(); pop.innerHTML=''; const list=(allTags||[]).filter(t=>!q || t.toLowerCase().includes(q)); list.forEach(t=>{ const item=el('div',{className:'tag-item'},t); item.addEventListener('click', async ()=>{ const res=await fetch('/api/machines/tags',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: it.id, tag: t })}); if(res.status===401){ location.assign('/login/'); return; } if(res.ok){ pop.style.display='none'; await loadMachines(); } }); pop.appendChild(item); }); }
-          arrowBtn.addEventListener('click', async ()=>{ await ensureTags(); renderPop(); pop.style.minWidth = addTagInput.offsetWidth+"px"; pop.style.left = addTagInput.offsetLeft+"px"; pop.style.top = (addTagInput.offsetTop + addTagInput.offsetHeight + 4)+"px"; pop.style.display= pop.style.display==='none' || !pop.style.display ? 'block' : 'none'; });
-          addTagInput.addEventListener('input', ()=>{ if(pop.style.display==='block'){ renderPop(); } });
-          addTagBtn.addEventListener('click', async ()=>{
-            const tag = addTagInput.value.trim(); if(!tag) return;
-            const res = await fetch('/api/machines/tags',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: it.id, tag })});
-            if(res.status===401){ location.assign('/login/'); return; }
-            if(res.ok){ await loadMachines(); }
-          });
-          tagBox.appendChild(tagInputWrap); tdTags.appendChild(tagBox);
+          tdTags.appendChild(tagBox);
           const ops=document.createElement('div'); ops.className='row-actions';
-          const saveBtn=el('button',{className:'btn', type:'button'},'修改');
-          saveBtn.addEventListener('click', async ()=>{
-            if(saveBtn.textContent==='修改'){
-              inName.disabled=false; inIP.disabled=false; inData.disabled=false; inDesc.disabled=false; addTagInput.disabled=false; saveBtn.textContent='保存'; inName.focus(); return;
-            }
-            const payload = { id: it.id, name: inName.value.trim(), ip: inIP.value.trim(), dataDisk: inData.value.trim(), description: inDesc.value.trim() };
-            const res = await fetch('/api/machines',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-            if(res.status===401){ location.assign('/login/'); return; }
-            if(res.ok){ inName.disabled=true; inIP.disabled=true; inData.disabled=true; inDesc.disabled=true; addTagInput.disabled=true; saveBtn.textContent='修改'; await loadMachines(); }
+          const editBtn=el('button',{className:'btn', type:'button'},'修改');
+          editBtn.addEventListener('click', async ()=>{
+            const mask=document.getElementById('modalMask');
+            document.querySelector('#modalMask .modal div').textContent='修改机器';
+            let detail = it;
+            try {
+              const res = await fetch('/api/machines_one?id='+(it.id||'')+'&includeCreds=true');
+              if(res.ok){ detail = await res.json(); }
+            } catch (e) {}
+            document.getElementById('mName').value = detail.name || '';
+            document.getElementById('mIP').value = detail.ip || '';
+            document.getElementById('mPort').value = detail.port || '';
+            document.getElementById('mUser').value = detail.username || '';
+            document.getElementById('mPass').value = detail.password || '';
+            document.getElementById('mKey').value = detail.key || '';
+            const box=document.getElementById('modalTags'); box.innerHTML='';
+            const tags = Array.isArray(detail.tags) ? detail.tags : [];
+            tags.forEach(t=> addModalTagToList(t));
+            const okBtn=document.getElementById('confirmAdd');
+            okBtn.textContent='保存';
+            okBtn.dataset.mode='edit';
+            okBtn.dataset.id = it.id || '';
+            mask.style.display='flex';
           });
           const delBtn=el('button',{className:'btn secondary', type:'button'},'删除');
           delBtn.addEventListener('click', async ()=>{
@@ -242,7 +227,7 @@
             if(res.status===401){ location.assign('/login/'); return; }
             if(res.ok){ await loadMachines(); }
           });
-          ops.appendChild(saveBtn); ops.appendChild(delBtn); tdOps.appendChild(ops);
+          ops.appendChild(editBtn); ops.appendChild(delBtn); tdOps.appendChild(ops);
         } else {
           tdName.textContent=it.name; tdIP.textContent=it.ip; tdCPU.textContent=it.cpu; tdMem.textContent=it.memory; tdDisk.textContent=it.disk; tdDataDisk.textContent=it.dataDisk; tdDesc.textContent=it.description;
           const tagBox=document.createElement('div'); tagBox.className='tags-wrap';
@@ -253,24 +238,51 @@
           const ops=document.createElement('div'); ops.className='row-actions';
           const linkBtn=el('button',{className:'btn secondary btn-mini', type:'button'},'链接测试');
           linkBtn.addEventListener('click', async ()=>{
-            const payload={ id: it.id, ip: it.ip, port: it.port||'22', username: it.username||'', password: it.password||'', key: it.key||'' };
+            let detail = it;
+            try {
+              const res = await fetch('/api/machines_one?id='+(it.id||'')+'&includeCreds=true');
+              if(res.status===401){ location.assign('/login/'); return; }
+              if(res.ok){ detail = await res.json(); }
+            } catch (e) {}
+            const payload={ id: detail.id, ip: detail.ip, port: detail.port||'22', username: detail.username||'', password: detail.password||'', key: detail.key||'' };
             const res=await fetch('/api/machines/test_connect',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-            let ok=false; if(res.ok){ const data=await res.json().catch(()=>({})); ok=!!data.ok; }
+            if(res.status===401){ location.assign('/login/'); return; }
+            let ok=false, errMsg='';
+            if(res.ok){ const data=await res.json().catch(()=>({})); ok=!!data.ok; errMsg = data.error || '';
+            } else {
+              const data=await res.json().catch(()=>({})); ok=false; errMsg = (data && data.error) || '';
+            }
+            Array.from(linkBtn.querySelectorAll('.mark-ok,.mark-fail')).forEach(x=>x.remove());
             const mark=document.createElement('span'); mark.className= ok ? 'mark-ok' : 'mark-fail'; mark.textContent= ok ? '✓' : '✗'; linkBtn.appendChild(mark);
+            if(!ok){ showError('连接测试失败', errMsg || '连接失败'); }
           });
           const infoBtn=el('button',{className:'btn secondary btn-mini', type:'button'},'信息读取');
           infoBtn.addEventListener('click', async ()=>{
-            const payload={ id: it.id, ip: it.ip, port: it.port||'22', username: it.username||'', password: it.password||'', key: it.key||'' };
+            let detail = it;
+            try {
+              const res = await fetch('/api/machines_one?id='+(it.id||'')+'&includeCreds=true');
+              if(res.status===401){ location.assign('/login/'); return; }
+              if(res.ok){ detail = await res.json(); }
+            } catch (e) {}
+            const payload={ id: detail.id, ip: detail.ip, port: detail.port||'22', username: detail.username||'', password: detail.password||'', key: detail.key||'' };
             const res=await fetch('/api/machines/read_info',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
             let ok=false; if(res.ok){ const data=await res.json().catch(()=>({})); ok=!!data.ok; }
+            Array.from(infoBtn.querySelectorAll('.mark-ok,.mark-fail')).forEach(x=>x.remove());
             const mark=document.createElement('span'); mark.className= ok ? 'mark-ok' : 'mark-fail'; mark.textContent= ok ? '✓' : '✗'; infoBtn.appendChild(mark);
             if(ok){ await loadMachines(); }
           });
           const initBtn=el('button',{className:'btn secondary btn-mini', type:'button'},'机器初始化');
           initBtn.addEventListener('click', async ()=>{
-            const payload={ id: it.id, ip: it.ip, port: it.port||'22', username: it.username||'', password: it.password||'', key: it.key||'' };
+            let detail = it;
+            try {
+              const res = await fetch('/api/machines_one?id='+(it.id||'')+'&includeCreds=true');
+              if(res.status===401){ location.assign('/login/'); return; }
+              if(res.ok){ detail = await res.json(); }
+            } catch (e) {}
+            const payload={ id: detail.id, ip: detail.ip, port: detail.port||'22', username: detail.username||'', password: detail.password||'', key: detail.key||'' };
             const res=await fetch('/api/machines/init',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
             let ok=false; if(res.ok){ const data=await res.json().catch(()=>({})); ok=!!data.ok; }
+            Array.from(initBtn.querySelectorAll('.mark-ok,.mark-fail')).forEach(x=>x.remove());
             const mark=document.createElement('span'); mark.className= ok ? 'mark-ok' : 'mark-fail'; mark.textContent= ok ? '✓' : '✗'; initBtn.appendChild(mark);
           });
           ops.appendChild(linkBtn); ops.appendChild(infoBtn); ops.appendChild(initBtn); tdOps.appendChild(ops);
@@ -288,29 +300,33 @@
     manageBtn.addEventListener('click', async ()=>{
       if(!edit){
         edit = true;
-        manageBtn.textContent = '保存';
+        manageBtn.textContent = '退出管理';
         addBtn.style.display = '';
         loadMachines();
         return;
-      }
-      const rows = Array.from(document.querySelectorAll('#tbody tr'));
-      for(const tr of rows){
-        const inputs = tr.querySelectorAll('input');
-        if(inputs.length){
-          const payload = {
-            id: tr.dataset.id || '',
-            name: inputs[0].value.trim(), ip: inputs[1].value.trim(), dataDisk: inputs[5].value.trim(), description: inputs[6].value.trim(),
-          };
-          await fetch('/api/machines',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-        }
       }
       edit = false;
       manageBtn.textContent = '管理';
       addBtn.style.display = 'none';
       loadMachines();
     });
-    document.getElementById('addMachine').addEventListener('click', ()=>{ document.getElementById('modalMask').style.display='flex'; });
-    document.getElementById('cancelAdd').addEventListener('click', ()=>{ document.getElementById('modalMask').style.display='none'; });
+    document.getElementById('addMachine').addEventListener('click', ()=>{
+      const mask=document.getElementById('modalMask');
+      document.querySelector('#modalMask .modal div').textContent='添加机器';
+      document.getElementById('mName').value='';
+      document.getElementById('mIP').value='';
+      document.getElementById('mPort').value='';
+      document.getElementById('mUser').value='';
+      document.getElementById('mPass').value='';
+      document.getElementById('mKey').value='';
+      document.getElementById('modalTags').innerHTML='';
+      const okBtn=document.getElementById('confirmAdd');
+      okBtn.textContent='添加';
+      okBtn.dataset.mode='add';
+      okBtn.dataset.id='';
+      mask.style.display='flex';
+    });
+    document.getElementById('cancelAdd').addEventListener('click', ()=>{ const okBtn=document.getElementById('confirmAdd'); okBtn.textContent='添加'; okBtn.dataset.mode='add'; okBtn.dataset.id=''; document.getElementById('modalMask').style.display='none'; });
     document.getElementById('confirmAdd').addEventListener('click', async ()=>{
       const name = document.getElementById('mName').value.trim();
       const ip = document.getElementById('mIP').value.trim();
@@ -320,6 +336,22 @@
       const key = document.getElementById('mKey').value.trim();
       const tags = Array.from(document.querySelectorAll('#modalTags .tag-link')).map(x=>x.textContent).filter(Boolean);
       if(!name || !ip){ return; }
+      const okBtn=document.getElementById('confirmAdd');
+      if(okBtn.dataset.mode==='edit'){
+        const id = okBtn.dataset.id || '';
+        const res = await fetch('/api/machines',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name, ip, port, username, password, key, tags })});
+        if(res.status===401){ location.assign('/login/'); return; }
+        if(res.ok){
+          document.getElementById('modalMask').style.display='none';
+          okBtn.textContent='添加'; okBtn.dataset.mode='add'; okBtn.dataset.id='';
+          const toast=document.getElementById('toast'); toast.textContent='保存成功'; toast.style.display='block'; setTimeout(()=>{ toast.style.display='none'; }, 5000);
+          await loadMachines();
+        } else {
+          const data = await res.json().catch(()=>({}));
+          showError('保存失败', (data && data.error) || '');
+        }
+        return;
+      }
       const res = await fetch('/api/machines',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, ip, port, username, password, key, tags })});
       if(res.status===401){ location.assign('/login/'); return; }
       if(res.ok){
@@ -328,21 +360,22 @@
         await loadMachines();
       } else {
         const data = await res.json().catch(()=>({}));
-        showError((data && data.error) || '添加失败');
+        showError('添加失败', (data && data.error) || '');
       }
     });
     // simple error modal
-    function showError(msg){
+    function showError(title,msg){
       let mask=document.getElementById('errorMask');
       if(!mask){
         mask=document.createElement('div'); mask.id='errorMask'; mask.style.position='fixed'; mask.style.inset='0'; mask.style.background='rgba(0,0,0,.35)'; mask.style.display='flex'; mask.style.alignItems='center'; mask.style.justifyContent='center'; mask.style.zIndex='1300';
         const box=document.createElement('div'); box.style.background='#fff'; box.style.borderRadius='12px'; box.style.boxShadow='0 12px 36px rgba(0,0,0,.2)'; box.style.padding='20px'; box.style.minWidth='280px';
-        const title=document.createElement('div'); title.textContent='添加失败'; title.style.fontWeight='600'; title.style.marginBottom='8px'; box.appendChild(title);
+        const t=document.createElement('div'); t.id='errorTitle'; t.style.fontWeight='600'; t.style.marginBottom='8px'; box.appendChild(t);
         const content=document.createElement('div'); content.id='errorContent'; content.style.color='#ef4444'; content.style.marginBottom='12px'; box.appendChild(content);
         const btn=document.createElement('button'); btn.textContent='关闭'; btn.className='btn'; btn.addEventListener('click', ()=>{ mask.style.display='none'; }); box.appendChild(btn);
         mask.appendChild(box); document.body.appendChild(mask);
       }
-      document.getElementById('errorContent').textContent = msg;
+      document.getElementById('errorTitle').textContent = title || '错误';
+      document.getElementById('errorContent').textContent = msg || '';
       mask.style.display='flex';
     }
     // modal tag dropdown logic
